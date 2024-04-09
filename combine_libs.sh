@@ -1,16 +1,9 @@
 #!/bin/bash
 
-# 创建一个临时目录来存放解压出的对象文件
-mkdir -p temp
-cd temp
-
-# 解压 libmvfst_codec_types.a
-ar -x ~/mvfst/_build/mvfst/lib/*.a
-
-
-# 将解压出的对象文件添加到 libcombined.a
-ar -q ~/QUIC-Mapper/build/libcombined.a *.o
-
-# 删除临时目录
+mkdir -p combined_lib
+cd combined_lib
+for lib in /home/russ/mvfst/_build/lib/libmvfst*.a; do ar -x $lib; done
+ar -q libmvfst.a *.o
+mv libmvfst.a ../
 cd ..
-rm -r temp
+# rm ./combined_lib -r
