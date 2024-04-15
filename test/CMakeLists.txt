@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
-project(Send)
+set(PROJECT_NAME SendPacketTest)
+project(${PROJECT_NAME})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -26,10 +27,10 @@ file(GLOB FIZZ_LIBS "/home/megaknight/mvfst/_build/fizz/lib/*.a")
 file(GLOB FMT_LIBS "/home/megaknight/mvfst/_build/fmt-nTwMPV08miEUzJ7GT_BuTouiztFh22CxIEhqqorjGtk/lib/*.a")
 
 
-add_executable(Send SendPacketTest.cpp)
+add_executable(${PROJECT_NAME} SendPacketTest.cpp)
 
 # 添加链接的库
-target_link_libraries(Send PUBLIC
+target_link_libraries(${PROJECT_NAME} PUBLIC
   mvfst
   ${FIZZ_LIBS}
   ${FOLLY_LIBS}

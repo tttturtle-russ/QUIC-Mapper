@@ -60,14 +60,14 @@ int main(int argc, char* argv[]) {
     // std::cout << "TEST:" << FLAGS_token << std::endl; 
     client.start(FLAGS_token);
     // 创建一个 LongHeaderBuilder
-    auto builder = LongHeaderBuilder(LongHeader::Types::Initial);
+    // auto builder = LongHeaderBuilder(LongHeader::Types::Initial);
 
-    // 使用 builder 创建一个 LongHeader 对象
-    ConnectionId srcConnId = "";  // 源连接ID
-    ConnectionId dstConnId = "";  // 目标连接ID
-    PacketNum packetNum = "";  // 包号
-    QuicVersion version = "";  // Quic版本
-    std::string token = "";  // 令牌
-    LongHeader header = builder(srcConnId, dstConnId, packetNum, version, token);
+    // // 使用 builder 创建一个 LongHeader 对象
+    // ConnectionId srcConnId = "";  // 源连接ID
+    // ConnectionId dstConnId = "";  // 目标连接ID
+    // PacketNum packetNum = "";  // 包号
+    // QuicVersion version = "";  // Quic版本
+    // std::string token = "";  // 令牌
+    // LongHeader header = builder(srcConnId, dstConnId, packetNum, version, token);
   return 0;
 }
