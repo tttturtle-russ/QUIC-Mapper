@@ -5,17 +5,7 @@ import asyncio
 from aioquic.quic.configuration import SMALLEST_MAX_DATAGRAM_SIZE
 from aioquic.buffer import Buffer
 from aioquic.tls import Epoch
-from aioquic.quic.packet import (
-    NON_ACK_ELICITING_FRAME_TYPES,
-    NON_IN_FLIGHT_FRAME_TYPES,
-    PACKET_NUMBER_MAX_SIZE,
-    PACKET_TYPE_HANDSHAKE,
-    PACKET_TYPE_INITIAL,
-    PACKET_TYPE_MASK,
-    QuicFrameType,
-    is_long_header,
-    QuicProtocolVersion,
-)
+from aioquic.quic.packet import *
 from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet_builder import QuicPacketBuilder, QuicPacketBuilderStop
@@ -30,7 +20,7 @@ def create_crypto():
     return crypto
 
 # 创建一个QuicPacketBuilder实例
-def create_builder(host_cid=bytes(8),is_client=False,peer_cid=bytes(8)):
+def create_builder(host_cid=bytes(8),is_client=False,peer_cid=bytes(8),version=QuicProtocolVersion.VERSION_1):
     return QuicPacketBuilder(
         host_cid=host_cid,
         is_client=is_client,
@@ -39,7 +29,7 @@ def create_builder(host_cid=bytes(8),is_client=False,peer_cid=bytes(8)):
         peer_cid=peer_cid,
         peer_token=b"",
         spin_bit=False,
-        version=QuicProtocolVersion.VERSION_1,
+        version=version,
     )
 
 class SimpleClientProtocol(asyncio.DatagramProtocol):
@@ -61,13 +51,13 @@ def send_datagrams(datagrams, addr):
     transport.close()
     loop.close()
 
-builder = create_builder(host_cid=b"11451400",is_client=True,peer_cid=b"19198100")
+builder = create_builder(host_cid=b"11451400",is_client=True,peer_cid=b"19198100",version=QuicProtocolVersion.VERSION_1)
 crypto = create_crypto()
 # 开始一个新的packet
-builder.start_packet(packet_type=PACKET_TYPE_INITIAL, crypto=crypto)
+builder.start_packet(packet_type=PACKET_TYPE_RETRY, crypto=crypto)
 
 # 添加一个frame到当前的packet中
-frame_type = QuicFrameType.CRYPTO  # 这是一个示例，你应该使用你需要的frame类型
+frame_type = QuicFrameType.PADDING # 这是一个示例，你应该使用你需要的frame类型
 try:
     buffer = builder.start_frame(frame_type=frame_type, capacity=1)
     # 在这里你可以写入你需要的数据到buffer中
@@ -80,19 +70,33 @@ except QuicPacketBuilderStop:
 # 结束当前的packet并获取构建好的datagrams和packets
 datagrams, packets = builder.flush()
 
-
-
-loop = asyncio.get_event_loop()
 # message = "Hello World!".encode()
 addr = ('192.168.0.100', 9999)
-for datagram in datagrams:
-    connect = loop.create_datagram_endpoint(
-        lambda: SimpleClientProtocol(datagram, addr),
-        remote_addr=addr)
-    transport, protocol = loop.run_until_complete(connect)
-transport.close()
-loop.close()
+send_datagrams(datagrams, addr)
 
 
 # 打印datagrams和packets以查看结果
 print(type(datagrams))
+
+''' TODO 完成数据包的解析函数 
+    try override the function _payload_received in QuicConnection (which used to deal with the received frame)
+    try to overide the function received_datagram in QuicConnection (which used to deal with the received datagram)
+'''
+
+def get_packet_type(data: bytes, connection_id_length: int) -> Optional[int]:
+    """
+    Parse a received datagram and return the packet type.
+
+    :param data: The datagram which was received.
+    :param connection_id_length: The length of the connection ID.
+    :return: The packet type, or None if the header cannot be parsed.
+    """
+    buf = Buffer(data=data)
+    try:
+        header = pull_quic_header(buf, host_cid_length=connection_id_length)
+        return header.packet_type
+    except ValueError:
+        return None
+
+print(get_packet_type(datagrams[0], 8))
+print(PACKET_TYPE_RETRY)
