@@ -820,7 +820,7 @@ class QuicConnection:
                         event="packet_dropped",
                         data={"trigger": "unknown_connection_id"},
                     )
-                return
+                # return
 
             # check protocol version
             if (

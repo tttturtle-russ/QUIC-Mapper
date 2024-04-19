@@ -10,6 +10,7 @@ from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet_builder import QuicPacketBuilder, QuicPacketBuilderStop
 from aioquic.asyncio.protocol import *
+from aioquic.quic.configuration import *
 # 创建一个CryptoPair实例
 # 在实际使用中，你应该使用你自己的密钥和算法来初始化这个实例
 def create_crypto():
@@ -51,13 +52,13 @@ def send_datagrams(datagrams, addr):
     transport.close()
     loop.close()
 
-builder = create_builder(host_cid=b"11451400",is_client=True,peer_cid=b"19198100",version=QuicProtocolVersion.VERSION_1)
+builder = create_builder(host_cid=b"11451400",is_client=True,peer_cid=b"19198100",version=QuicProtocolVersion.NEGOTIATION)
 crypto = create_crypto()
 # 开始一个新的packet
-builder.start_packet(packet_type=PACKET_TYPE_RETRY, crypto=crypto)
+builder.start_packet(packet_type=PACKET_TYPE_INITIAL, crypto=crypto)
 
 # 添加一个frame到当前的packet中
-frame_type = QuicFrameType.PADDING # 这是一个示例，你应该使用你需要的frame类型
+frame_type = QuicFrameType.CRYPTO # 这是一个示例，你应该使用你需要的frame类型
 try:
     buffer = builder.start_frame(frame_type=frame_type, capacity=1)
     # 在这里你可以写入你需要的数据到buffer中
@@ -74,16 +75,20 @@ datagrams, packets = builder.flush()
 addr = ('192.168.0.100', 9999)
 send_datagrams(datagrams, addr)
 
-
+addrs = '192.168.0.100'
 # 打印datagrams和packets以查看结果
 print(type(datagrams))
-
+quicConfig = QuicConfiguration()
+quicConnection = QuicConnection(configuration=quicConfig)
+for datagram in datagrams:
+    quicConnection.receive_datagram(datagram, ("192.168.0.100",9999), now=0)
+    print("jiexizhong")
 ''' TODO 完成数据包的解析函数 
     try override the function _payload_received in QuicConnection (which used to deal with the received frame)
-    try to overide the function received_datagram in QuicConnection (which used to deal with the received datagram)
+    try to override the function received_datagram in QuicConnection (which used to deal with the received datagram)
 '''
 
-def get_packet_type(data: bytes, connection_id_length: int) -> Optional[int]:
+def get_packet_type(data: bytes, connection_id_length: Optional[int] = None) -> Optional[int]:
     """
     Parse a received datagram and return the packet type.
 
@@ -94,9 +99,14 @@ def get_packet_type(data: bytes, connection_id_length: int) -> Optional[int]:
     buf = Buffer(data=data)
     try:
         header = pull_quic_header(buf, host_cid_length=connection_id_length)
+        print("header.packet_type", header.packet_type)
+        print("header.version", header.version)
+        print("destination_cid", header.destination_cid)
+        print("source_cid", header.source_cid)
         return header.packet_type
+
     except ValueError:
         return None
 
-print(get_packet_type(datagrams[0], 8))
-print(PACKET_TYPE_RETRY)
+print(get_packet_type(datagrams[0], ))
+print(PACKET_TYPE_INITIAL)
