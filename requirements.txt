@@ -1,0 +1,11 @@
+aioquic==1.0.0
+attrs==23.2.0
+certifi==2024.2.2
+cffi==1.16.0
+cryptography==42.0.5
+pyasn1==0.6.0
+pyasn1_modules==0.4.0
+pycparser==2.22
+pylsqpack==0.3.18
+pyOpenSSL==24.1.0
+service-identity==24.1.0
