@@ -29,6 +29,7 @@ from aioquic.buffer import (
 from aioquic.quic import events
 from aioquic.quic.configuration import (SMALLEST_MAX_DATAGRAM_SIZE, QuicConfiguration)
 from aioquic.quic.congestion.base import K_GRANULARITY
+from aioquic.quic.connection import dump_cid, END_STATES, UDP_HEADER_SIZE, NetworkAddress
 from aioquic.quic.crypto import CryptoError, CryptoPair, KeyUnavailableError
 from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet import (
@@ -64,6 +65,7 @@ from aioquic.quic.packet_builder import (
 )
 from aioquic.quic.recovery import QuicPacketRecovery, QuicPacketSpace
 from aioquic.quic.stream import FinalSizeError, QuicStream, StreamFinishedError
+
 
 def receive_datagram(self, data: bytes, addr: NetworkAddress, now: float) -> None:
     """

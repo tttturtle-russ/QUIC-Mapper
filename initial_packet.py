@@ -71,18 +71,6 @@ class InitialPacket(BasePacket):
                          is_client=is_client,
                          peer_token=peer_token,
                          packet_number=packet_number)
-        self.frames = []
         self.packet_type = PACKET_TYPE_INITIAL
 
-    def push_frame(self, frame_type: QuicFrameType, data: Dict[str, Union[int, bytes]]):
-        try:
-            buffer = self.builder.start_frame(frame_type=frame_type)
-            for _type, value in data.items():
-                if _type not in TYPE_MAP_TO_FUNCTION:
-                    raise ValueError(f"Type {_type} is not supported")
-                TYPE_MAP_TO_FUNCTION[_type](buffer, value)
-        except QuicPacketBuilderStop:
-            raise ValueError("Packet is full")
 
-    def build(self) -> Tuple[List[bytes], List[QuicSentPacket]]:
-        return self.builder.flush()

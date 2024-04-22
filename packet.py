@@ -3,7 +3,7 @@ from typing import Optional, Tuple, List, Dict, Union
 from aioquic.quic.configuration import SMALLEST_MAX_DATAGRAM_SIZE
 from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.packet import QuicProtocolVersion, QuicFrameType
-from aioquic.quic.packet_builder import QuicPacketBuilder, QuicSentPacket
+from aioquic.quic.packet_builder import QuicPacketBuilder, QuicSentPacket, QuicPacketBuilderStop
 
 
 def push_bytes(buffer, data: bytes):
@@ -60,7 +60,7 @@ class BasePacket:
         self.packet_number = packet_number
         self.is_client = is_client
         self.packet_type = None
-        self.builder = QuicPacketBuilder(
+        self._builder = QuicPacketBuilder(
             host_cid=self.host,
             peer_cid=self.peer,
             is_client=self.is_client,
@@ -70,7 +70,7 @@ class BasePacket:
             spin_bit=False,
             version=self.version,
         )
-        self.crypto = self._create_crypto()
+        self._crypto = self._create_crypto()
 
     def _create_crypto(self) -> CryptoPair:
         crypto = CryptoPair()
@@ -86,16 +86,25 @@ class BasePacket:
     def new_packet(self):
         if self.packet_type is None:
             raise ValueError("Packet type is not set")
-        self.builder.start_packet(packet_type=self.packet_type, crypto=self.crypto)
+        self._builder.start_packet(packet_type=self.packet_type, crypto=self._crypto)
 
-    def push_frame(self, frame_type: QuicFrameType, data: Dict[str, Union[int, bytes]]):
+    def push_frame(self, frame_type: QuicFrameType, data: List[Tuple[str, Union[int, bytes]]]):
         """
         Push a frame to the packet
         """
-        raise NotImplementedError
+        try:
+            buffer = self._builder.start_frame(frame_type=frame_type)
+            for _type, value in data:
+                if _type not in TYPE_MAP_TO_FUNCTION:
+                    raise ValueError(f"Unknown type {_type}")
+                TYPE_MAP_TO_FUNCTION[_type](buffer, value)
+        except QuicPacketBuilderStop:
+            raise ValueError("Not enough space to push frame")
+        except Exception as e:
+            raise RuntimeError(f"Error when pushing frame: {e}")
 
     def build(self) -> Tuple[List[bytes], List[QuicSentPacket]]:
         """
         Build the packet
         """
-        raise NotImplementedError
+        return self._builder.flush()

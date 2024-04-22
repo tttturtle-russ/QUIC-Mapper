@@ -1,14 +1,20 @@
 from aioquic.quic.packet import *
 from initial_packet import InitialPacket
+from retry_packet import RetryPacket
 
-p = InitialPacket()
-p.new_packet()
-p.push_frame(QuicFrameType.CRYPTO, {"bytes": b"hello"})
-p.new_packet()
-p.push_frame(QuicFrameType.CRYPTO, {"bytes": b"world"})
-datagrams, packets = p.build()
-print(datagrams)
-print(packets)
+pkg = RetryPacket()
+pkg.new_packet()
+
+pkg.new_packet()
+
+datastreams, packets = pkg.build()
+
+for datastream in datastreams:
+    print(datastream)
+
+for packet in packets:
+    print(packet)
+
 # # 创建一个CryptoPair实例
 # # 在实际使用中，你应该使用你自己的密钥和算法来初始化这个实例
 # def create_crypto():
