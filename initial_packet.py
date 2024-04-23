@@ -8,40 +8,14 @@ from packet import BasePacket, TYPE_MAP_TO_FUNCTION
 
 class InitialPacket(BasePacket):
     """
-    Initial Packet is structured as follows:
-    +-+-+-+-+-+-+-+-+
-    |1|  Type (7)   |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                         Version (32)                          |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    | DCIL (4) | SCIL (4) |                                         |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |               Destination Connection ID (0/32..144)           |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                 Source Connection ID (0/32..144)              |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                    Token Length (i)                           |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                            Token (*)                          ...
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                           Length (i)                          ...
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                    Packet Number (8/16/32)                    |
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |                          Payload (*)                          ...
-    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
     Here is an example of how to use this class:
     ```
         packet = InitialPacket(args...)
-        data = {
-            "int": "1",
-            "bytes": b"hello"
-        }
+        data = [("uint64", 123)]
         # This is the packet 0
         packet.new_packet()
         packet.push_frame(QuicFrameType.CRYPTO, data)
-        packet.push_frame(QuicFrameType.ACK, {"int", "0"})
+        packet.push_frame(QuicFrameType.ACK, [("uint16", 222)])
         # Packet 0 has 2 frames now
 
         # This is the packet 1

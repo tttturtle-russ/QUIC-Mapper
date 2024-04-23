@@ -80,6 +80,7 @@ EPOCH_SHORTCUTS = {
     "1": tls.Epoch.ONE_RTT,
 }
 
+
 class QuicConnectionError(Exception):
     def __init__(self, error_code: int, frame_type: int, reason_phrase: str):
         self.error_code = error_code
@@ -92,6 +93,7 @@ class QuicConnectionError(Exception):
             s += ", frame_type: %s" % self.frame_type
         return s
 
+
 class Limit:
     def __init__(self, frame_type: int, name: str, value: int):
         self.frame_type = frame_type
@@ -100,12 +102,14 @@ class Limit:
         self.used = 0
         self.value = value
 
+
 @dataclass
 class QuicConnectionId:
     cid: bytes
     sequence_number: int
     stateless_reset_token: bytes = b""
     was_sent: bool = False
+
 
 @dataclass
 class QuicReceiveContext:
@@ -114,6 +118,7 @@ class QuicReceiveContext:
     # network_path: QuicNetworkPath
     quic_logger_frames: Optional[List[Any]]
     time: float
+
 
 def EPOCHS(shortcut: str) -> FrozenSet[tls.Epoch]:
     return frozenset(EPOCH_SHORTCUTS[i] for i in shortcut)
@@ -136,6 +141,7 @@ def get_epoch(packet_type: int) -> tls.Epoch:
 
 QuicTokenHandler = Callable[[bytes], None]
 
+
 # END_STATES = frozenset(
 #     [
 #         QuicConnectionState.CLOSING,
@@ -150,16 +156,17 @@ def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
     else:
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS
 
+
 class Handle:
     def __init__(
-        self,
-        *,
-        configuration: QuicConfiguration,
-        original_destination_connection_id: Optional[bytes] = None,
-        retry_source_connection_id: Optional[bytes] = None,
-        session_ticket_fetcher: Optional[tls.SessionTicketFetcher] = None,
-        session_ticket_handler: Optional[tls.SessionTicketHandler] = None,
-        token_handler: Optional[QuicTokenHandler] = None,
+            self,
+            *,
+            configuration: QuicConfiguration,
+            original_destination_connection_id: Optional[bytes] = None,
+            retry_source_connection_id: Optional[bytes] = None,
+            session_ticket_fetcher: Optional[tls.SessionTicketFetcher] = None,
+            session_ticket_handler: Optional[tls.SessionTicketHandler] = None,
+            token_handler: Optional[QuicTokenHandler] = None,
     ) -> None:
         assert configuration.max_datagram_size >= SMALLEST_MAX_DATAGRAM_SIZE, (
             "The smallest allowed maximum datagram size is "
@@ -167,10 +174,10 @@ class Handle:
         )
         if configuration.is_client:
             assert (
-                original_destination_connection_id is None
+                    original_destination_connection_id is None
             ), "Cannot set original_destination_connection_id for a client"
             assert (
-                retry_source_connection_id is None
+                    retry_source_connection_id is None
             ), "Cannot set retry_source_connection_id for a client"
 
         # configuration
@@ -419,7 +426,7 @@ class Handle:
             #             event="packet_dropped",
             #             data={"trigger": "unknown_connection_id"},
             #         )
-                # return
+            # return
 
             # # check protocol version
             # if (
@@ -881,7 +888,6 @@ class Handle:
 
         self._loss.spaces = list(self._spaces.values())
 
-
     def _handle_ack_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -914,7 +920,6 @@ class Handle:
             now=context.time,
             space=self._spaces[context.epoch],
         )
-
 
     def _handle_connection_close_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -955,7 +960,6 @@ class Handle:
                 reason_phrase=reason_phrase,
             )
             self._close_begin(is_initiator=False, now=context.time)
-
 
     def _handle_crypto_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1052,7 +1056,6 @@ class Handle:
                 self._loss.reschedule_data(now=context.time)
                 self._crypto_retransmitted = True
 
-
     def _handle_data_blocked_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1066,7 +1069,6 @@ class Handle:
             context.quic_logger_frames.append(
                 self._quic_logger.encode_data_blocked_frame(limit=limit)
             )
-
 
     def _handle_datagram_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1100,7 +1102,6 @@ class Handle:
 
         self._events.append(events.DatagramFrameReceived(data=data))
 
-
     def _handle_handshake_done_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1126,7 +1127,6 @@ class Handle:
             self._handshake_confirmed = True
             self._loss.peer_completed_address_validation = True
 
-
     def _handle_max_data_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1148,7 +1148,6 @@ class Handle:
         if max_data > self._remote_max_data:
             self._logger.debug("Remote max_data raised to %d", max_data)
             self._remote_max_data = max_data
-
 
     def _handle_max_stream_data_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1181,7 +1180,6 @@ class Handle:
             )
             stream.max_stream_data_remote = max_stream_data
 
-
     def _handle_max_streams_bidi_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1211,7 +1209,6 @@ class Handle:
             self._remote_max_streams_bidi = max_streams
             self._unblock_streams(is_unidirectional=False)
 
-
     def _handle_max_streams_uni_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1240,7 +1237,6 @@ class Handle:
             self._logger.debug("Remote max_streams_uni raised to %d", max_streams)
             self._remote_max_streams_uni = max_streams
             self._unblock_streams(is_unidirectional=True)
-
 
     def _handle_new_connection_id_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1343,7 +1339,6 @@ class Handle:
                 reason_phrase="Too many pending retired connection IDs",
             )
 
-
     def _handle_new_token_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1369,7 +1364,6 @@ class Handle:
         if self._token_handler is not None:
             self._token_handler(token)
 
-
     def _handle_padding_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1388,7 +1382,6 @@ class Handle:
         if self._quic_logger is not None:
             context.quic_logger_frames.append(self._quic_logger.encode_padding_frame())
 
-
     def _handle_path_challenge_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1404,7 +1397,6 @@ class Handle:
             )
 
         context.network_path.remote_challenge = data
-
 
     def _handle_path_response_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1431,7 +1423,6 @@ class Handle:
         )
         context.network_path.is_validated = True
 
-
     def _handle_ping_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1441,7 +1432,6 @@ class Handle:
         # log frame
         if self._quic_logger is not None:
             context.quic_logger_frames.append(self._quic_logger.encode_ping_frame())
-
 
     def _handle_reset_stream_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1501,7 +1491,6 @@ class Handle:
             self._events.append(event)
         self._local_max_data.used += newly_received
 
-
     def _handle_retire_connection_id_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1546,7 +1535,6 @@ class Handle:
         # issue a new connection ID
         self._replenish_connection_ids()
 
-
     def _handle_stop_sending_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1574,7 +1562,6 @@ class Handle:
         self._events.append(
             events.StopSendingReceived(error_code=error_code, stream_id=stream_id)
         )
-
 
     def _handle_stream_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1639,7 +1626,6 @@ class Handle:
             self._events.append(event)
         self._local_max_data.used += newly_received
 
-
     def _handle_stream_data_blocked_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
     ) -> None:
@@ -1661,7 +1647,6 @@ class Handle:
         self._assert_stream_can_receive(frame_type, stream_id)
 
         self._get_or_create_stream(frame_type, stream_id)
-
 
     def _handle_streams_blocked_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer

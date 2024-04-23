@@ -18,20 +18,20 @@ from typing import (
     Tuple,
 )
 
-from .. import tls
-from ..buffer import (
+from aioquic import tls
+from aioquic.buffer import (
     UINT_VAR_MAX,
     UINT_VAR_MAX_SIZE,
     Buffer,
     BufferReadError,
     size_uint_var,
 )
-from . import events
-from .configuration import SMALLEST_MAX_DATAGRAM_SIZE, QuicConfiguration
-from .congestion.base import K_GRANULARITY
-from .crypto import CryptoError, CryptoPair, KeyUnavailableError
-from .logger import QuicLoggerTrace
-from .packet import (
+from aioquic.quic import events
+from aioquic.quic.configuration import SMALLEST_MAX_DATAGRAM_SIZE, QuicConfiguration
+from aioquic.quic.congestion.base import K_GRANULARITY
+from aioquic.quic.crypto import CryptoError, CryptoPair, KeyUnavailableError
+from aioquic.quic.logger import QuicLoggerTrace
+from aioquic.quic.packet import (
     CONNECTION_ID_MAX_SIZE,
     NON_ACK_ELICITING_FRAME_TYPES,
     PACKET_TYPE_HANDSHAKE,
@@ -57,13 +57,13 @@ from .packet import (
     push_ack_frame,
     push_quic_transport_parameters,
 )
-from .packet_builder import (
+from aioquic.quic.packet_builder import (
     QuicDeliveryState,
     QuicPacketBuilder,
     QuicPacketBuilderStop,
 )
-from .recovery import QuicPacketRecovery, QuicPacketSpace
-from .stream import FinalSizeError, QuicStream, StreamFinishedError
+from aioquic.quic.recovery import QuicPacketRecovery, QuicPacketSpace
+from aioquic.quic.stream import FinalSizeError, QuicStream, StreamFinishedError
 
 logger = logging.getLogger("quic")
 

@@ -1,6 +1,7 @@
 from packet import BasePacket
 from aioquic.quic.packet import QuicProtocolVersion, PACKET_TYPE_RETRY, QuicFrameType
-from typing import Optional, List, Tuple, Union, override
+from typing import Optional, List, Tuple, Union
+from typing_extensions import override
 
 
 class RetryPacket(BasePacket):
