@@ -73,12 +73,35 @@ STREAM_COUNT_MAX = 0x1000000000000000
 UDP_HEADER_SIZE = 8
 MAX_PENDING_RETIRES = 100
 
+SECRETS_LABELS = [
+    [
+        None,
+        "CLIENT_EARLY_TRAFFIC_SECRET",
+        "CLIENT_HANDSHAKE_TRAFFIC_SECRET",
+        "CLIENT_TRAFFIC_SECRET_0",
+    ],
+    [
+        None,
+        None,
+        "SERVER_HANDSHAKE_TRAFFIC_SECRET",
+        "SERVER_TRAFFIC_SECRET_0",
+    ],
+]
+
+logger = logging.getLogger("quic")
+
 EPOCH_SHORTCUTS = {
     "I": tls.Epoch.INITIAL,
     "H": tls.Epoch.HANDSHAKE,
     "0": tls.Epoch.ZERO_RTT,
     "1": tls.Epoch.ONE_RTT,
 }
+
+def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
+    if is_draft_version(version):
+        return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS_DRAFT
+    else:
+        return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS
 
 
 class QuicConnectionError(Exception):
@@ -138,6 +161,10 @@ def get_epoch(packet_type: int) -> tls.Epoch:
     else:
         return tls.Epoch.ONE_RTT
 
+class QuicConnectionAdapter(logging.LoggerAdapter):
+    def process(self, msg: str, kwargs: Any) -> Tuple[str, Any]:
+        return "[%s] %s" % (self.extra["id"], msg), kwargs
+
 
 QuicTokenHandler = Callable[[bytes], None]
 
@@ -186,7 +213,7 @@ class Handle:
         #
         # self._ack_delay = K_GRANULARITY
         # self._close_at: Optional[float] = None
-        # self._close_event: Optional[events.ConnectionTerminated] = None
+        self._close_event: Optional[events.ConnectionTerminated] = None
         # self._connect_called = False
         self._cryptos: Dict[tls.Epoch, CryptoPair] = {}
         self._crypto_buffers: Dict[tls.Epoch, Buffer] = {}
@@ -271,25 +298,25 @@ class Handle:
             self._original_destination_connection_id = self._peer_cid.cid
 
         # logging
-        # self._logger = QuicConnectionAdapter(
-        #     logger, {"id": dump_cid(self._original_destination_connection_id)}
-        # )
-        # if configuration.quic_logger:
-        #     self._quic_logger = configuration.quic_logger.start_trace(
-        #         is_client=configuration.is_client,
-        #         odcid=self._original_destination_connection_id,
-        #     )
+        self._logger = QuicConnectionAdapter(
+            logger, {"id": dump_cid(self._original_destination_connection_id)}
+        )
+        if configuration.quic_logger:
+            self._quic_logger = configuration.quic_logger.start_trace(
+                is_client=configuration.is_client,
+                odcid=self._original_destination_connection_id,
+            )
 
         # loss recovery
-        # self._loss = QuicPacketRecovery(
-        #     congestion_control_algorithm=configuration.congestion_control_algorithm,
-        #     initial_rtt=configuration.initial_rtt,
-        #     max_datagram_size=self._max_datagram_size,
-        #     peer_completed_address_validation=not self._is_client,
-        #     quic_logger=self._quic_logger,
-        #     send_probe=self._send_probe,
-        #     logger=self._logger,
-        # )
+        self._loss = QuicPacketRecovery(
+            congestion_control_algorithm=configuration.congestion_control_algorithm,
+            initial_rtt=configuration.initial_rtt,
+            max_datagram_size=self._max_datagram_size,
+            peer_completed_address_validation=not self._is_client,
+            quic_logger=self._quic_logger,
+            send_probe=self._send_probe,
+            logger=self._logger,
+        )
 
         # things to send
         # self._close_pending = False
@@ -301,9 +328,9 @@ class Handle:
         # self._streams_blocked_pending = False
         #
         # # callbacks
-        # self._session_ticket_fetcher = session_ticket_fetcher
-        # self._session_ticket_handler = session_ticket_handler
-        # self._token_handler = token_handler
+        self._session_ticket_fetcher = session_ticket_fetcher
+        self._session_ticket_handler = session_ticket_handler
+        self._token_handler = token_handler
 
         # frame handlers
         self.__frame_handlers = {
@@ -342,6 +369,9 @@ class Handle:
             0x31: (self._handle_datagram_frame, EPOCHS("01")),
         }
 
+    def initialize(self, peer_cid: bytes):
+        self._initialize(peer_cid=peer_cid)
+
     def receive_datagram(self, data: bytes, addr: NetworkAddress, now: float) -> None:
         """
         Handle an incoming datagram.
@@ -373,7 +403,7 @@ class Handle:
         # for servers, arm the idle timeout on the first datagram
         # if self._close_at is None:
         #     self._close_at = now + self._idle_timeout()
-
+        # self._initialize(b'')
         buf = Buffer(data=data)
         while not buf.eof():
             start_off = buf.tell()
@@ -797,9 +827,9 @@ class Handle:
             cadata=self._configuration.cadata,
             cafile=self._configuration.cafile,
             capath=self._configuration.capath,
-            cipher_suites=self.configuration.cipher_suites,
+            cipher_suites=self._configuration.cipher_suites,
             is_client=self._is_client,
-            logger=self._logger,
+            # logger=self._logger,
             max_early_data=None if self._is_client else MAX_EARLY_DATA,
             server_name=self._configuration.server_name,
             verify_mode=self._configuration.verify_mode,
@@ -810,7 +840,7 @@ class Handle:
         self.tls.handshake_extensions = [
             (
                 get_transport_parameters_extension(self._version),
-                self._serialize_transport_parameters(),
+                # self._serialize_transport_parameters(),
             )
         ]
 
@@ -1670,3 +1700,231 @@ class Handle:
                     limit=limit,
                 )
             )
+
+
+    def _log_key_updated(self, key_type: str, trigger: str) -> None:
+        """
+        Log a key update.
+        """
+        if self._quic_logger is not None:
+            self._quic_logger.log_event(
+                category="security",
+                event="key_updated",
+                data={"key_type": key_type, "trigger": trigger},
+            )
+
+    def _send_probe(self) -> None:
+        self._probe_pending = True
+
+    def _log_key_retired(self, key_type: str, trigger: str) -> None:
+        """
+        Log a key retirement.
+        """
+        if self._quic_logger is not None:
+            self._quic_logger.log_event(
+                category="security",
+                event="key_retired",
+                data={"key_type": key_type, "trigger": trigger},
+            )
+
+    def _update_traffic_key(
+        self,
+        direction: tls.Direction,
+        epoch: tls.Epoch,
+        cipher_suite: tls.CipherSuite,
+        secret: bytes,
+    ) -> None:
+        """
+        Callback which is invoked by the TLS engine when new traffic keys are
+        available.
+        """
+        secrets_log_file = self._configuration.secrets_log_file
+        if secrets_log_file is not None:
+            label_row = self._is_client == (direction == tls.Direction.DECRYPT)
+            label = SECRETS_LABELS[label_row][epoch.value]
+            secrets_log_file.write(
+                "%s %s %s\n" % (label, self.tls.client_random.hex(), secret.hex())
+            )
+            secrets_log_file.flush()
+
+        crypto = self._cryptos[epoch]
+        if direction == tls.Direction.ENCRYPT:
+            crypto.send.setup(
+                cipher_suite=cipher_suite, secret=secret, version=self._version
+            )
+        else:
+            crypto.recv.setup(
+                cipher_suite=cipher_suite, secret=secret, version=self._version
+            )
+
+    def _alpn_handler(self, alpn_protocol: str) -> None:
+        """
+        Callback which is invoked by the TLS engine when ALPN negotiation completes.
+        """
+        self._events.append(events.ProtocolNegotiated(alpn_protocol=alpn_protocol))
+
+    def _parse_transport_parameters(
+            self, data: bytes, from_session_ticket: bool = False
+    ) -> None:
+        """
+        Parse and apply remote transport parameters.
+
+        `from_session_ticket` is `True` when restoring saved transport parameters,
+        and `False` when handling received transport parameters.
+        """
+
+        try:
+            quic_transport_parameters = pull_quic_transport_parameters(
+                Buffer(data=data)
+            )
+        except ValueError:
+            raise QuicConnectionError(
+                error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                frame_type=QuicFrameType.CRYPTO,
+                reason_phrase="Could not parse QUIC transport parameters",
+            )
+
+        # log event
+        if self._quic_logger is not None and not from_session_ticket:
+            self._quic_logger.log_event(
+                category="transport",
+                event="parameters_set",
+                data=self._quic_logger.encode_transport_parameters(
+                    owner="remote", parameters=quic_transport_parameters
+                ),
+            )
+
+        # validate remote parameters
+        if not self._is_client:
+            for attr in [
+                "original_destination_connection_id",
+                "preferred_address",
+                "retry_source_connection_id",
+                "stateless_reset_token",
+            ]:
+                if getattr(quic_transport_parameters, attr) is not None:
+                    raise QuicConnectionError(
+                        error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                        frame_type=QuicFrameType.CRYPTO,
+                        reason_phrase="%s is not allowed for clients" % attr,
+                    )
+
+        if not from_session_ticket:
+            if (
+                    quic_transport_parameters.initial_source_connection_id
+                    != self._remote_initial_source_connection_id
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="initial_source_connection_id does not match",
+                )
+            if self._is_client and (
+                    quic_transport_parameters.original_destination_connection_id
+                    != self._original_destination_connection_id
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="original_destination_connection_id does not match",
+                )
+            if self._is_client and (
+                    quic_transport_parameters.retry_source_connection_id
+                    != self._retry_source_connection_id
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="retry_source_connection_id does not match",
+                )
+            if (
+                    quic_transport_parameters.active_connection_id_limit is not None
+                    and quic_transport_parameters.active_connection_id_limit < 2
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="active_connection_id_limit must be no less than 2",
+                )
+            if (
+                    quic_transport_parameters.ack_delay_exponent is not None
+                    and quic_transport_parameters.ack_delay_exponent > 20
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="ack_delay_exponent must be <= 20",
+                )
+            if (
+                    quic_transport_parameters.max_ack_delay is not None
+                    and quic_transport_parameters.max_ack_delay >= 2 ** 14
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase="max_ack_delay must be < 2^14",
+                )
+            if quic_transport_parameters.max_udp_payload_size is not None and (
+                    quic_transport_parameters.max_udp_payload_size
+                    < SMALLEST_MAX_DATAGRAM_SIZE
+            ):
+                raise QuicConnectionError(
+                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+                    frame_type=QuicFrameType.CRYPTO,
+                    reason_phrase=(
+                        f"max_udp_payload_size must be >= {SMALLEST_MAX_DATAGRAM_SIZE}"
+                    ),
+                )
+
+        # store remote parameters
+        if not from_session_ticket:
+            if quic_transport_parameters.ack_delay_exponent is not None:
+                self._remote_ack_delay_exponent = self._remote_ack_delay_exponent
+            if quic_transport_parameters.max_ack_delay is not None:
+                self._loss.max_ack_delay = (
+                        quic_transport_parameters.max_ack_delay / 1000.0
+                )
+            if (
+                    self._is_client
+                    and self._peer_cid.sequence_number == 0
+                    and quic_transport_parameters.stateless_reset_token is not None
+            ):
+                self._peer_cid.stateless_reset_token = (
+                    quic_transport_parameters.stateless_reset_token
+                )
+
+        if quic_transport_parameters.active_connection_id_limit is not None:
+            self._remote_active_connection_id_limit = (
+                quic_transport_parameters.active_connection_id_limit
+            )
+        if quic_transport_parameters.max_idle_timeout is not None:
+            self._remote_max_idle_timeout = (
+                    quic_transport_parameters.max_idle_timeout / 1000.0
+            )
+        self._remote_max_datagram_frame_size = (
+            quic_transport_parameters.max_datagram_frame_size
+        )
+        for param in [
+            "max_data",
+            "max_stream_data_bidi_local",
+            "max_stream_data_bidi_remote",
+            "max_stream_data_uni",
+            "max_streams_bidi",
+            "max_streams_uni",
+        ]:
+            value = getattr(quic_transport_parameters, "initial_" + param)
+            if value is not None:
+                setattr(self, "_remote_" + param, value)
+
+    def _handle_session_ticket(self, session_ticket: tls.SessionTicket) -> None:
+        if (
+            session_ticket.max_early_data_size is not None
+            and session_ticket.max_early_data_size != MAX_EARLY_DATA
+        ):
+            raise QuicConnectionError(
+                error_code=QuicErrorCode.PROTOCOL_VIOLATION,
+                frame_type=QuicFrameType.CRYPTO,
+                reason_phrase="Invalid max_early_data value %s"
+                % session_ticket.max_early_data_size,
+            )
+        self._session_ticket_handler(session_ticket)
