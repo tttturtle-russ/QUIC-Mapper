@@ -96,7 +96,8 @@ class BasePacket:
             buffer = self._builder.start_frame(frame_type=frame_type)
             for _type, value in data:
                 if _type not in TYPE_MAP_TO_FUNCTION:
-                    raise ValueError(f"Unknown type {_type}")
+                    raise ValueError(f"Unknown type {_type}, type must be one of the following: bytes, uint8, uint16, "
+                                     f"uint32, uint64, varint")
                 TYPE_MAP_TO_FUNCTION[_type](buffer, value)
         except QuicPacketBuilderStop:
             raise ValueError("Not enough space to push frame")

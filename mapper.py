@@ -1,11 +1,12 @@
-from aioquic.quic.packet import *
 from initial_packet import InitialPacket
-from retry_packet import RetryPacket
-
-pkg = RetryPacket()
+from aioquic.quic.packet import *
+pkg = InitialPacket()
 pkg.new_packet()
+pkg.push_frame(QuicFrameType.CRYPTO, [("bytes", b"hello")])
+pkg.push_frame(QuicFrameType.ACK, [("uint16", 1)])
 
 pkg.new_packet()
+pkg.push_frame(QuicFrameType.CRYPTO, [("bytes", b"world")])
 
 datastreams, packets = pkg.build()
 
