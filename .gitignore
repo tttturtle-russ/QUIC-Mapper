@@ -246,6 +246,5 @@ cython_debug/
 .vscode/
 .vs/
 =======
-*.pem
 *.qlog
 >>>>>>> Stashed changes

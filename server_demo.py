@@ -4,14 +4,15 @@ from aioquic.quic.configuration import QuicConfiguration
 import contextlib
 
 import os
-SERVER_CACERTFILE = os.path.join(os.path.dirname(__file__), "pycacert.pem")
-SERVER_CERTFILE = os.path.join(os.path.dirname(__file__), "ssl_cert.pem")
+SERVER_CACERTFILE = os.path.join(os.getcwd(), "verify", "pycacert.pem")
+
+SERVER_CERTFILE = os.path.join(os.getcwd(), "verify", "ssl_cert.pem")
 SERVER_CERTFILE_WITH_CHAIN = os.path.join(
-    os.path.dirname(__file__), "ssl_cert_with_chain.pem"
+    os.getcwd(), "verify", "ssl_cert_with_chain.pem"
 )
-SERVER_KEYFILE = os.path.join(os.path.dirname(__file__), "ssl_key.pem")
-SERVER_COMBINEDFILE = os.path.join(os.path.dirname(__file__), "ssl_combined.pem")
-SKIP_TESTS = frozenset(os.environ.get("AIOQUIC_SKIP_TESTS", "").split(","))
+SERVER_KEYFILE = os.path.join(os.getcwd(), "verify", "ssl_key.pem")
+SERVER_COMBINEDFILE = os.path.join(os.getcwd(), "verify", "ssl_combined.pem")
+# SKIP_TESTS = frozenset(os.environ.get("AIOQUIC_SKIP_TESTS", "").split(","))
 
 def handle_stream(reader, writer):
     async def serve():

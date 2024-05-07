@@ -407,7 +407,7 @@ class Handle:
         self._initialize(peer_cid=peer_cid)
 
     def end_trace_file(self):
-        _Quic_file_logger.end_trace(self._quic_logger)
+        _Quic_file_logger.end_trace(self._quic_logger,dump_cid(self._peer_cid.cid))
 
 
     def datagrams_to_send(self, now: float) -> List[Tuple[bytes, NetworkAddress]]:

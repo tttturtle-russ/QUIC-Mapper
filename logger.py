@@ -2,6 +2,7 @@ import binascii
 import json
 import os
 import time
+from datetime import datetime
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional
 
@@ -316,10 +317,10 @@ class QuicFileLogger(QuicLogger):
         self.path = path
         super().__init__()
 
-    def end_trace(self, trace: QuicLoggerTrace) -> None:
+    def end_trace(self, trace: QuicLoggerTrace,dcid=b'') -> None:
         trace_dict = trace.to_dict()
         trace_path = os.path.join(
-            self.path,  "test2.qlog"
+            self.path, dcid + '_' + str(datetime.now()) + ".qlog"
         )
         with open(trace_path, "w") as logger_fp:
             json.dump(
