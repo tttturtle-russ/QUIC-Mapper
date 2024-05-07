@@ -241,6 +241,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+<<<<<<< Updated upstream
 #Visual Studio Code
 .vscode/
 .vs/
+=======
+*.pem
+*.qlog
+>>>>>>> Stashed changes

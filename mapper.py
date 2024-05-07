@@ -1,5 +1,10 @@
 from initial_packet import InitialPacket
 from aioquic.quic.packet import *
+from aioquic.asyncio.protocol import *
+from aioquic.asyncio.client import *
+from aioquic.quic.crypto import *
+from aioquic.quic.packet_builder import *
+
 pkg = InitialPacket()
 pkg.new_packet()
 pkg.push_frame(QuicFrameType.CRYPTO, [("bytes", b"hello")])
@@ -16,56 +21,56 @@ for datastream in datastreams:
 for packet in packets:
     print(packet)
 
-# # 创建一个CryptoPair实例
-# # 在实际使用中，你应该使用你自己的密钥和算法来初始化这个实例
-# def create_crypto():
-#     crypto = CryptoPair()
-#     crypto.setup_initial(
-#         bytes(8), is_client=True, version=QuicProtocolVersion.VERSION_1
-#     )
-#     return crypto
+# 创建一个CryptoPair实例
+# 在实际使用中，你应该使用你自己的密钥和算法来初始化这个实例
+def create_crypto():
+    crypto = CryptoPair()
+    crypto.setup_initial(
+        bytes(8), is_client=True, version=QuicProtocolVersion.VERSION_1
+    )
+    return crypto
+
+#
+# 创建一个QuicPacketBuilder实例
+def create_builder(host_cid=bytes(8), is_client=False, peer_cid=bytes(8), version=QuicProtocolVersion.VERSION_1):
+    return QuicPacketBuilder(
+        host_cid=host_cid,
+        is_client=is_client,
+        max_datagram_size=2^64-1,
+        packet_number=0,
+        peer_cid=peer_cid,
+        peer_token=b"",
+        spin_bit=False,
+        version=version,
+    )
 #
 #
-# # 创建一个QuicPacketBuilder实例
-# def create_builder(host_cid=bytes(8), is_client=False, peer_cid=bytes(8), version=QuicProtocolVersion.VERSION_1):
-#     return QuicPacketBuilder(
-#         host_cid=host_cid,
-#         is_client=is_client,
-#         max_datagram_size=SMALLEST_MAX_DATAGRAM_SIZE,
-#         packet_number=0,
-#         peer_cid=peer_cid,
-#         peer_token=b"",
-#         spin_bit=False,
-#         version=version,
-#     )
+class SimpleClientProtocol(asyncio.DatagramProtocol):
+    def __init__(self, message, addr):
+        self.message = message
+        self.addr = addr
+
+    def connection_made(self, transport):
+        transport.sendto(self.message, self.addr)
+        # print('Data sent: {!r}'.format(self.message))
+#
+# #
+def send_datagrams(datagrams, addr):
+    loop = asyncio.get_event_loop()
+    for datagram in datagrams:
+        connect = loop.create_datagram_endpoint(
+            lambda: SimpleClientProtocol(datagram, addr),
+            remote_addr=addr)
+        transport, protocol = loop.run_until_complete(connect)
+    transport.close()
+    loop.close()
 #
 #
-# class SimpleClientProtocol(asyncio.DatagramProtocol):
-#     def __init__(self, message, addr):
-#         self.message = message
-#         self.addr = addr
-#
-#     def connection_made(self, transport):
-#         transport.sendto(self.message, self.addr)
-#         # print('Data sent: {!r}'.format(self.message))
-#
-#
-# def send_datagrams(datagrams, addr):
-#     loop = asyncio.get_event_loop()
-#     for datagram in datagrams:
-#         connect = loop.create_datagram_endpoint(
-#             lambda: SimpleClientProtocol(datagram, addr),
-#             remote_addr=addr)
-#         transport, protocol = loop.run_until_complete(connect)
-#     transport.close()
-#     loop.close()
-#
-#
-# builder = create_builder(host_cid=b"11451400", is_client=True, peer_cid=b"19198100",
-#                          version=QuicProtocolVersion.NEGOTIATION)
-# crypto = create_crypto()
-# # 开始一个新的packet
-# builder.start_packet(packet_type=PACKET_TYPE_INITIAL, crypto=crypto)
+builder = create_builder(host_cid=b"11451400", is_client=True, peer_cid=b"19198100",
+                         version=QuicProtocolVersion.NEGOTIATION)
+crypto = create_crypto()
+# 开始一个新的packet
+builder.start_packet(packet_type=PACKET_TYPE_INITIAL, crypto=crypto)
 #
 # # 添加一个frame到当前的packet中
 # frame_type = QuicFrameType.CRYPTO  # 这是一个示例，你应该使用你需要的frame类型
@@ -82,8 +87,8 @@ for packet in packets:
 # datagrams, packets = builder.flush()
 #
 # # message = "Hello World!".encode()
-# addr = ('192.168.0.100', 9999)
-# send_datagrams(datagrams, addr)
+addr = ('192.168.0.100', 9999)
+send_datagrams(datagrams, addr)
 #
 # addrs = '192.168.0.100'
 # # 打印datagrams和packets以查看结果

@@ -30,7 +30,7 @@ from aioquic.quic import events
 from aioquic.quic.configuration import (SMALLEST_MAX_DATAGRAM_SIZE, QuicConfiguration)
 from aioquic.quic.congestion.base import K_GRANULARITY
 from aioquic.quic.crypto import CryptoError, CryptoPair, KeyUnavailableError
-from aioquic.quic.logger import QuicLoggerTrace
+# from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet import (
     CONNECTION_ID_MAX_SIZE,
     NON_ACK_ELICITING_FRAME_TYPES,
@@ -65,6 +65,10 @@ from aioquic.quic.packet_builder import (
 from aioquic.quic.recovery import QuicPacketRecovery, QuicPacketSpace
 from aioquic.quic.stream import FinalSizeError, QuicStream, StreamFinishedError
 
+from logger import *
+
+from utils import *
+
 NetworkAddress = Any
 CRYPTO_BUFFER_SIZE = 16384
 MAX_EARLY_DATA = 0xFFFFFFFF
@@ -72,6 +76,24 @@ STREAM_FLAGS = 0x07
 STREAM_COUNT_MAX = 0x1000000000000000
 UDP_HEADER_SIZE = 8
 MAX_PENDING_RETIRES = 100
+
+# frame sizes
+ACK_FRAME_CAPACITY = 64  # FIXME: this is arbitrary!
+APPLICATION_CLOSE_FRAME_CAPACITY = 1 + 2 * UINT_VAR_MAX_SIZE  # + reason length
+CONNECTION_LIMIT_FRAME_CAPACITY = 1 + UINT_VAR_MAX_SIZE
+HANDSHAKE_DONE_FRAME_CAPACITY = 1
+MAX_STREAM_DATA_FRAME_CAPACITY = 1 + 2 * UINT_VAR_MAX_SIZE
+NEW_CONNECTION_ID_FRAME_CAPACITY = (
+    1 + 2 * UINT_VAR_MAX_SIZE + 1 + CONNECTION_ID_MAX_SIZE + STATELESS_RESET_TOKEN_SIZE
+)
+PATH_CHALLENGE_FRAME_CAPACITY = 1 + 8
+PATH_RESPONSE_FRAME_CAPACITY = 1 + 8
+PING_FRAME_CAPACITY = 1
+RESET_STREAM_FRAME_CAPACITY = 1 + 3 * UINT_VAR_MAX_SIZE
+RETIRE_CONNECTION_ID_CAPACITY = 1 + UINT_VAR_MAX_SIZE
+STOP_SENDING_FRAME_CAPACITY = 1 + 2 * UINT_VAR_MAX_SIZE
+STREAMS_BLOCKED_CAPACITY = 1 + UINT_VAR_MAX_SIZE
+TRANSPORT_CLOSE_FRAME_CAPACITY = 1 + 3 * UINT_VAR_MAX_SIZE  # + reason length
 
 SECRETS_LABELS = [
     [
@@ -133,6 +155,14 @@ class QuicConnectionId:
     stateless_reset_token: bytes = b""
     was_sent: bool = False
 
+class QuicConnectionState(Enum):
+    FIRSTFLIGHT = 0
+    CONNECTED = 1
+    CLOSING = 2
+    DRAINING = 3
+    TERMINATED = 4
+
+
 
 @dataclass
 class QuicReceiveContext:
@@ -177,11 +207,15 @@ QuicTokenHandler = Callable[[bytes], None]
 #     ]
 # )
 
+_Quic_logger = QuicLogger()
+_Quic_file_logger = QuicFileLogger(os.getcwd())
+
 def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
     if is_draft_version(version):
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS_DRAFT
     else:
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS
+
 
 
 class Handle:
@@ -211,7 +245,7 @@ class Handle:
         self._configuration = configuration
         self._is_client = True
         #
-        # self._ack_delay = K_GRANULARITY
+        self._ack_delay = K_GRANULARITY
         # self._close_at: Optional[float] = None
         self._close_event: Optional[events.ConnectionTerminated] = None
         # self._connect_called = False
@@ -219,10 +253,9 @@ class Handle:
         self._crypto_buffers: Dict[tls.Epoch, Buffer] = {}
         self._crypto_retransmitted = False
         self._crypto_streams: Dict[tls.Epoch, QuicStream] = {}
-        # self._events: Deque[events.QuicEvent] = deque()
-        # self._handshake_complete = False
-        # self._handshake_confirmed = False
-
+        self._events: Deque[events.QuicEvent] = deque()
+        self._handshake_complete = False
+        self._handshake_confirmed = False
         self._host_cids = [
             QuicConnectionId(
                 cid=os.urandom(configuration.connection_id_length),
@@ -267,10 +300,10 @@ class Handle:
         self._peer_cid_sequence_numbers: Set[int] = set([0])
         self._peer_retire_prior_to = 0
         self._peer_token = configuration.token
-        self._quic_logger: Optional[QuicLoggerTrace] = None
-        # self._remote_ack_delay_exponent = 3
+        self._quic_logger = _Quic_logger.start_trace()
+        self._remote_ack_delay_exponent = 3
         # self._remote_active_connection_id_limit = 2
-        # self._remote_initial_source_connection_id: Optional[bytes] = None
+        self._remote_initial_source_connection_id: Optional[bytes] = None
         # self._remote_max_idle_timeout: Optional[float] = None  # seconds
         # self._remote_max_data = 0
         # self._remote_max_data_used = 0
@@ -285,13 +318,13 @@ class Handle:
         self._spaces: Dict[tls.Epoch, QuicPacketSpace] = {}
         self._spin_bit = False
         self._spin_highest_pn = 0
-        # self._state = QuicConnectionState.FIRSTFLIGHT
+        self._state = QuicConnectionState.FIRSTFLIGHT
         # self._streams: Dict[int, QuicStream] = {}
         # self._streams_queue: List[QuicStream] = []
         # self._streams_blocked_bidi: List[QuicStream] = []
         # self._streams_blocked_uni: List[QuicStream] = []
         # self._streams_finished: Set[int] = set()
-        self._version: Optional[int] = None
+        self._version: Optional[int] = QuicProtocolVersion.VERSION_1
         self._version_negotiation_count = 0
 
         if self._is_client:
@@ -301,11 +334,11 @@ class Handle:
         self._logger = QuicConnectionAdapter(
             logger, {"id": dump_cid(self._original_destination_connection_id)}
         )
-        if configuration.quic_logger:
-            self._quic_logger = configuration.quic_logger.start_trace(
-                is_client=configuration.is_client,
-                odcid=self._original_destination_connection_id,
-            )
+        # if configuration.quic_logger:
+        #     self._quic_logger = configuration.quic_logger.start_trace(
+        #         is_client=configuration.is_client,
+        #         odcid=self._original_destination_connection_id,
+        #     )
 
         # loss recovery
         self._loss = QuicPacketRecovery(
@@ -323,7 +356,7 @@ class Handle:
         # self._datagrams_pending: Deque[bytes] = deque()
         # self._handshake_done_pending = False
         # self._ping_pending: List[int] = []
-        # self._probe_pending = False
+        self._probe_pending = False
         # self._retire_connection_ids: List[int] = []
         # self._streams_blocked_pending = False
         #
@@ -369,8 +402,110 @@ class Handle:
             0x31: (self._handle_datagram_frame, EPOCHS("01")),
         }
 
+
     def initialize(self, peer_cid: bytes):
         self._initialize(peer_cid=peer_cid)
+
+    def end_trace_file(self):
+        _Quic_file_logger.end_trace(self._quic_logger)
+
+
+    def datagrams_to_send(self, now: float) -> List[Tuple[bytes, NetworkAddress]]:
+        """
+        Return a list of `(data, addr)` tuples of datagrams which need to be
+        sent, and the network address to which they need to be sent.
+
+        After calling this method call :meth:`get_timer` to know when the next
+        timer needs to be set.
+
+        :param now: The current time.
+        """
+
+        # build datagrams
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=self._is_client,
+            max_datagram_size=self._max_datagram_size,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=self._peer_token,
+            quic_logger=self._quic_logger,
+            spin_bit=self._spin_bit,
+            version=self._version,
+        )
+
+        try:
+            # 实现握手，initial包和handshake包
+            if not self._handshake_confirmed:
+                for epoch in [tls.Epoch.INITIAL, tls.Epoch.HANDSHAKE]:
+                    self._write_handshake(builder, epoch, now)
+        except QuicPacketBuilderStop:
+            pass
+
+        datagrams, packets = builder.flush()
+
+        if datagrams:
+            self._packet_number = builder.packet_number
+
+            # register packets
+            sent_handshake = False
+            for packet in packets:
+                packet.sent_time = now
+                self._loss.on_packet_sent(
+                    packet=packet, space=self._spaces[packet.epoch]
+                )
+                if packet.epoch == tls.Epoch.HANDSHAKE:
+                    sent_handshake = True
+
+                # log packet
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_sent",
+                        data={
+                            "frames": packet.quic_logger_frames,
+                            "header": {
+                                "packet_number": packet.packet_number,
+                                "packet_type": self._quic_logger.packet_type(
+                                    packet.packet_type
+                                ),
+                                "scid": (
+                                    dump_cid(self.host_cid)
+                                    if is_long_header(packet.packet_type)
+                                    else ""
+                                ),
+                                "dcid": dump_cid(self._peer_cid.cid),
+                            },
+                            "raw": {"length": packet.sent_bytes},
+                        },
+                    )
+
+            # check if we can discard initial keys
+            if sent_handshake and self._is_client:
+                self._discard_epoch(tls.Epoch.INITIAL)
+
+        # return datagrams to send and the destination network address
+        ret = []
+        for datagram in datagrams:
+            payload_length = len(datagram)
+            addr = None
+            ret.append((datagram, addr))
+
+            if self._quic_logger is not None:
+                self._quic_logger.log_event(
+                    category="transport",
+                    event="datagrams_sent",
+                    data={
+                        "count": 1,
+                        "raw": [
+                            {
+                                "length": UDP_HEADER_SIZE + payload_length,
+                                "payload_length": payload_length,
+                            }
+                        ],
+                    },
+                )
+        return ret
 
     def receive_datagram(self, data: bytes, addr: NetworkAddress, now: float) -> None:
         """
@@ -403,7 +538,6 @@ class Handle:
         # for servers, arm the idle timeout on the first datagram
         # if self._close_at is None:
         #     self._close_at = now + self._idle_timeout()
-        # self._initialize(b'')
         buf = Buffer(data=data)
         while not buf.eof():
             start_off = buf.tell()
@@ -412,17 +546,16 @@ class Handle:
                     buf, host_cid_length=self._configuration.connection_id_length
                 )
             except ValueError:
-                # if self._quic_logger is not None:
-                #     self._quic_logger.log_event(
-                #         category="transport",
-                #         event="packet_dropped",
-                #         data={
-                #             "trigger": "header_parse_error",
-                #             "raw": {"length": buf.capacity - start_off},
-                #         },
-                #     )
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_dropped",
+                        data={
+                            "trigger": "header_parse_error",
+                            "raw": {"length": buf.capacity - start_off},
+                        },
+                    )
                 return
-
             # RFC 9000 section 14.1 requires servers to drop all initial packets
             # # contained in a datagram smaller than 1200 bytes.
             # if (
@@ -599,14 +732,16 @@ class Handle:
                     data[start_off:end_off], encrypted_off, space.expected_packet_number
                 )
             except KeyUnavailableError as exc:
-                # self._logger.debug(exc)
-                # if self._quic_logger is not None:
-                #     self._quic_logger.log_event(
-                #         category="transport",
-                #         event="packet_dropped",
-                #         data={"trigger": "key_unavailable"},
-                #     )
-                print("key_unavailable\n")
+                self._logger.debug(exc)
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_dropped",
+                        data={"trigger": "key_unavailable"},
+                    )
+
+                return
+                # print("key_unavailable\n")
 
             # check reserved bits
             if header.is_long_header:
@@ -619,7 +754,6 @@ class Handle:
                 #     frame_type=QuicFrameType.PADDING,
                 #     reason_phrase="Reserved bits must be zero",
                 # )
-                print("Reserved bits must be zero\n")
                 return
 
             # log packet
@@ -647,9 +781,14 @@ class Handle:
             if packet_number > space.expected_packet_number:
                 space.expected_packet_number = packet_number + 1
 
-            # discard initial keys and packet space
-            # if not self._is_client and epoch == tls.Epoch.HANDSHAKE:
-            #     self._discard_epoch(tls.Epoch.INITIAL)
+            # update state
+            if self._peer_cid.sequence_number is None:
+                self._peer_cid.cid = header.source_cid
+                self._peer_cid.sequence_number = 0
+
+            # if self._state == QuicConnectionState.FIRSTFLIGHT:
+            #     self._remote_initial_source_connection_id = header.source_cid
+            #     self._set_state(QuicConnectionState.CONNECTED)
 
             # update spin bit
             if not header.is_long_header and packet_number > self._spin_highest_pn:
@@ -731,6 +870,9 @@ class Handle:
             #     if is_ack_eliciting and space.ack_at is None:
             #         space.ack_at = now + self._ack_delay
 
+
+
+
     def _payload_received(
             self,
             context: QuicReceiveContext,
@@ -809,15 +951,6 @@ class Handle:
                 reason_phrase="Packet contains no frames",
             )
 
-        # RFC 9000 - 17.2.2. Initial Packet
-        # The first packet sent by a client always includes a CRYPTO frame.
-        if crypto_frame_required and not crypto_frame_found:
-            raise QuicConnectionError(
-                error_code=QuicErrorCode.PROTOCOL_VIOLATION,
-                frame_type=QuicFrameType.PADDING,
-                reason_phrase="Packet contains no CRYPTO frame",
-            )
-
         return is_ack_eliciting, bool(is_probing)
 
     def _initialize(self, peer_cid: bytes) -> None:
@@ -840,7 +973,7 @@ class Handle:
         self.tls.handshake_extensions = [
             (
                 get_transport_parameters_extension(self._version),
-                # self._serialize_transport_parameters(),
+                self._serialize_transport_parameters(),
             )
         ]
 
@@ -1066,8 +1199,8 @@ class Handle:
                         session_resumed=self.tls.session_resumed,
                     )
                 )
-                self._unblock_streams(is_unidirectional=False)
-                self._unblock_streams(is_unidirectional=True)
+                # self._unblock_streams(is_unidirectional=False)
+                # self._unblock_streams(is_unidirectional=True)
                 self._logger.info(
                     "ALPN negotiated protocol %s", self.tls.alpn_negotiated
                 )
@@ -1928,3 +2061,264 @@ class Handle:
                 % session_ticket.max_early_data_size,
             )
         self._session_ticket_handler(session_ticket)
+
+    def _push_crypto_data(self) -> None:
+        for epoch, buf in self._crypto_buffers.items():
+            self._crypto_streams[epoch].sender.write(buf.data)
+            buf.seek(0)
+
+    def _discard_epoch(self, epoch: tls.Epoch) -> None:
+        if not self._spaces[epoch].discarded:
+            self._logger.debug("Discarding epoch %s", epoch)
+            self._cryptos[epoch].teardown()
+            self._loss.discard_space(self._spaces[epoch])
+            self._spaces[epoch].discarded = True
+
+    def _replenish_connection_ids(self) -> None:
+        """
+        Generate new connection IDs.
+        """
+        while len(self._host_cids) < min(8, self._remote_active_connection_id_limit):
+            self._host_cids.append(
+                QuicConnectionId(
+                    cid=os.urandom(self._configuration.connection_id_length),
+                    sequence_number=self._host_cid_seq,
+                    stateless_reset_token=os.urandom(16),
+                )
+            )
+            self._host_cid_seq += 1
+
+    def _write_handshake(
+            self, builder: QuicPacketBuilder, epoch: tls.Epoch, now: float
+    ) -> None:
+        crypto = self._cryptos[epoch]
+        if not crypto.send.is_valid():
+            return
+
+        crypto_stream = self._crypto_streams[epoch]
+        space = self._spaces[epoch]
+
+        while True:
+            if epoch == tls.Epoch.INITIAL:
+                packet_type = PACKET_TYPE_INITIAL
+            else:
+                packet_type = PACKET_TYPE_HANDSHAKE
+            builder.start_packet(packet_type, crypto)
+
+            # ACK
+            if space.ack_at is not None:
+                self._write_ack_frame(builder=builder, space=space, now=now)
+
+            # CRYPTO
+            if not crypto_stream.sender.buffer_is_empty:
+                if self._write_crypto_frame(
+                        builder=builder, space=space, stream=crypto_stream
+                ):
+                    self._probe_pending = False
+
+            # PING (probe)
+            if (
+                    self._probe_pending
+                    and not self._handshake_complete
+                    and (
+                    epoch == tls.Epoch.HANDSHAKE
+                    or not self._cryptos[tls.Epoch.HANDSHAKE].send.is_valid()
+            )
+            ):
+                self._write_ping_frame(builder, comment="probe")
+                self._probe_pending = False
+
+            if builder.packet_is_empty:
+                break
+
+    def _write_crypto_frame(
+        self, builder: QuicPacketBuilder, space: QuicPacketSpace, stream: QuicStream
+    ) -> bool:
+        frame_overhead = 3 + size_uint_var(stream.sender.next_offset)
+        frame = stream.sender.get_frame(builder.remaining_flight_space - frame_overhead)
+        if frame is not None:
+            buf = builder.start_frame(
+                QuicFrameType.CRYPTO,
+                capacity=frame_overhead,
+                handler=stream.sender.on_data_delivery,
+                handler_args=(frame.offset, frame.offset + len(frame.data), False),
+            )
+            buf.push_uint_var(frame.offset)
+            buf.push_uint16(len(frame.data) | 0x4000)
+            buf.push_bytes(frame.data)
+
+            # log frame
+            if self._quic_logger is not None:
+                builder.quic_logger_frames.append(
+                    self._quic_logger.encode_crypto_frame(frame)
+                )
+            return True
+
+        return False
+
+    def _write_ack_frame(
+        self, builder: QuicPacketBuilder, space: QuicPacketSpace, now: float
+    ) -> None:
+        # calculate ACK delay
+        ack_delay = now - space.largest_received_time
+        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+
+        buf = builder.start_frame(
+            QuicFrameType.ACK,
+            capacity=ACK_FRAME_CAPACITY,
+            handler=self._on_ack_delivery,
+            handler_args=(space, space.largest_received_packet),
+        )
+        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        space.ack_at = None
+
+        # log frame
+        if self._quic_logger is not None:
+            builder.quic_logger_frames.append(
+                self._quic_logger.encode_ack_frame(
+                    ranges=space.ack_queue, delay=ack_delay
+                )
+            )
+
+        # check if we need to trigger an ACK-of-ACK
+        if ranges > 1 and builder.packet_number % 8 == 0:
+            self._write_ping_frame(builder, comment="ACK-of-ACK trigger")
+
+    def _write_ping_frame(
+        self, builder: QuicPacketBuilder, uids: List[int] = [], comment=""
+    ):
+        builder.start_frame(
+            QuicFrameType.PING,
+            capacity=PING_FRAME_CAPACITY,
+            handler=self._on_ping_delivery,
+            handler_args=(tuple(uids),),
+        )
+        self._logger.debug(
+            "Sending PING%s in packet %d",
+            " (%s)" % comment if comment else "",
+            builder.packet_number,
+        )
+
+        # log frame
+        if self._quic_logger is not None:
+            builder.quic_logger_frames.append(self._quic_logger.encode_ping_frame())
+
+    def send_initial_packet(self):
+
+        builder=QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=0,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=QuicProtocolVersion.VERSION_1,
+            max_datagram_size=self._max_datagram_size,
+        )
+
+        crypto = self._cryptos[tls.Epoch.INITIAL]
+
+        builder.start_packet(PACKET_TYPE_INITIAL, crypto)
+        stream = self._crypto_streams[tls.Epoch.INITIAL]
+        frame_overhead = 3 + size_uint_var(stream.sender.next_offset)
+        frame = stream.sender.get_frame(builder.remaining_flight_space - frame_overhead)
+        if frame is not None:
+            buf = builder.start_frame(
+                QuicFrameType.CRYPTO,
+                capacity=frame_overhead,
+                handler=stream.sender.on_data_delivery,
+                handler_args=(frame.offset, frame.offset + len(frame.data), False),
+            )
+            buf.push_uint_var(frame.offset)
+            buf.push_uint16(len(frame.data) | 0x4000)
+            buf.push_bytes(frame.data)
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def send_handshake_packet(self):
+        builder=QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=0,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=QuicProtocolVersion.VERSION_1,
+            max_datagram_size=self._max_datagram_size,
+        )
+
+        crypto =self._cryptos[tls.Epoch.INITIAL]
+        space = self._spaces[tls.Epoch.INITIAL]
+        packet_type = PACKET_TYPE_INITIAL
+
+        builder.start_packet(packet_type, crypto)
+        ack_delay = self._ack_delay
+        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+
+        buf = builder.start_frame(
+            QuicFrameType.ACK,
+            capacity=ACK_FRAME_CAPACITY,
+            handler_args=(space, space.largest_received_packet),
+        )
+        space.ack_queue = RangeSet([range(0, 1)])
+        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        space.ack_at = None
+        datagrams , packets = builder.flush()
+        return datagrams
+
+        # crypto = self._cryptos[tls.Epoch.HANDSHAKE]
+        # space = self._spaces[tls.Epoch.HANDSHAKE]
+        # packet_type = PACKET_TYPE_HANDSHAKE
+        # builder.start_packet(packet_type, crypto)
+
+    def connect(self):
+        # self._peer_cid.cid = b'12345678'
+        self._initialize(self._peer_cid.cid)
+        self.tls.handle_message(b'',self._crypto_buffers)
+        self._push_crypto_data()
+        datagrams = self.send_initial_packet()
+        # datagrams = self.send_handshake_packet()
+        return datagrams
+
+
+
+    def _serialize_transport_parameters(self) -> bytes:
+        quic_transport_parameters = QuicTransportParameters(
+            ack_delay_exponent=self._local_ack_delay_exponent,
+            active_connection_id_limit=self._local_active_connection_id_limit,
+            max_idle_timeout=int(self._configuration.idle_timeout * 1000),
+            initial_max_data=self._local_max_data.value,
+            initial_max_stream_data_bidi_local=self._local_max_stream_data_bidi_local,
+            initial_max_stream_data_bidi_remote=self._local_max_stream_data_bidi_remote,
+            initial_max_stream_data_uni=self._local_max_stream_data_uni,
+            initial_max_streams_bidi=self._local_max_streams_bidi.value,
+            initial_max_streams_uni=self._local_max_streams_uni.value,
+            initial_source_connection_id=self._local_initial_source_connection_id,
+            max_ack_delay=25,
+            max_datagram_frame_size=self._configuration.max_datagram_frame_size,
+            quantum_readiness=(
+                b"Q" * SMALLEST_MAX_DATAGRAM_SIZE
+                if self._configuration.quantum_readiness_test
+                else None
+            ),
+            stateless_reset_token=self._host_cids[0].stateless_reset_token,
+        )
+        if not self._is_client:
+            quic_transport_parameters.original_destination_connection_id = (
+                self._original_destination_connection_id
+            )
+            quic_transport_parameters.retry_source_connection_id = (
+                self._retry_source_connection_id
+            )
+
+        # log event
+        if self._quic_logger is not None:
+            self._quic_logger.log_event(
+                category="transport",
+                event="parameters_set",
+                data=self._quic_logger.encode_transport_parameters(
+                    owner="local", parameters=quic_transport_parameters
+                ),
+            )
+
+        buf = Buffer(capacity=3 * self._max_datagram_size)
+        push_quic_transport_parameters(buf, quic_transport_parameters)
+        return buf.data

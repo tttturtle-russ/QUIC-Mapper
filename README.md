@@ -1,7 +1,10 @@
 ## QUIC-Mapper
 
 ## Usage
+Use protocol.py to test connection between client and server after run server_demo.py
+destination port in protocol.py is need to change after run server_demo.py
 
+```python
 ### Construct a packet
 ```python
 from initial_packet import InitialPacket
