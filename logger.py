@@ -320,7 +320,7 @@ class QuicFileLogger(QuicLogger):
     def end_trace(self, trace: QuicLoggerTrace,dcid=b'') -> None:
         trace_dict = trace.to_dict()
         trace_path = os.path.join(
-            self.path, dcid + '_' + str(datetime.now()) + ".qlog"
+            self.path, dcid + '_' + str(datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + ".qlog"
         )
         with open(trace_path, "w") as logger_fp:
             json.dump(

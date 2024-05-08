@@ -9,6 +9,7 @@ class MyServerProtocol(asyncio.DatagramProtocol):
         self.transport = None
         self.handle = Handle(configuration=QuicConfiguration())
         self._handshake_confirm = False
+        self._handshake_done = False
         # self.handle.connect()
 
     def connection_made(self, transport):
@@ -22,6 +23,10 @@ class MyServerProtocol(asyncio.DatagramProtocol):
         header = pull_quic_header(buf)
         if header.packet_type == PACKET_TYPE_INITIAL and self._handshake_confirm is False:
             self._handshake_confirm = True
+            for datagram in self.handle.send_initial_ack_packet():
+                self.transmit(datagram, addr)
+        if header.packet_type == PACKET_TYPE_HANDSHAKE and self._handshake_done is False:
+            self._handshake_done = True
             for datagram in self.handle.send_handshake_packet():
                 self.transmit(datagram, addr)
 
@@ -42,11 +47,11 @@ class MyServerProtocol(asyncio.DatagramProtocol):
 
 async def main():
     loop = asyncio.get_running_loop()
-    addr = ("127.0.0.1", 58988)
+    addr = ("127.0.0.1", 10086)
     # 创建一个 UDP 端点
     transport, protocol = await loop.create_datagram_endpoint(
         lambda: MyServerProtocol(),
-        local_addr=("127.0.0.1", 10021))
+        local_addr=("127.0.0.1", 10023))
 
     try:
         protocol.connect(addr)
@@ -55,7 +60,7 @@ async def main():
         # for data in protocol.handle.send_handshake_packet():
         #     protocol.transmit(data,addr)
         # while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
         protocol.end_trace()
         # protocol.transmit(protocol.handshake_packet(),addr)
 # 每秒检查一次

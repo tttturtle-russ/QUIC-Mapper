@@ -300,7 +300,7 @@ class Handle:
         self._peer_cid_sequence_numbers: Set[int] = set([0])
         self._peer_retire_prior_to = 0
         self._peer_token = configuration.token
-        self._quic_logger = _Quic_logger.start_trace()
+        self._quic_logger = _Quic_file_logger.start_trace()
         self._remote_ack_delay_exponent = 3
         # self._remote_active_connection_id_limit = 2
         self._remote_initial_source_connection_id: Optional[bytes] = None
@@ -826,6 +826,7 @@ class Handle:
                 #     reason_phrase=exc.reason_phrase,
                 # )
                 print("connection error\n")
+            print(("data_received\n"))
             # if self._state in END_STATES or self._close_pending:
             #     return
 
@@ -2208,7 +2209,7 @@ class Handle:
         builder=QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
-            packet_number=0,
+            packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=QuicProtocolVersion.VERSION_1,
@@ -2232,13 +2233,14 @@ class Handle:
             buf.push_uint16(len(frame.data) | 0x4000)
             buf.push_bytes(frame.data)
         datagrams, packets = builder.flush()
+        self._packet_number += 1
         return datagrams
 
-    def send_handshake_packet(self):
+    def send_initial_ack_packet(self):
         builder=QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
-            packet_number=0,
+            packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=QuicProtocolVersion.VERSION_1,
@@ -2262,12 +2264,123 @@ class Handle:
         ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
         space.ack_at = None
         datagrams , packets = builder.flush()
+        self._packet_number += 1
+        return datagrams
+
+
+    def send_handshake_packet(self):
+        builder=QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=QuicProtocolVersion.VERSION_1,
+            max_datagram_size=self._max_datagram_size,
+        )
+
+        crypto = self._cryptos[tls.Epoch.HANDSHAKE]
+        # crypto_stream = self._crypto_streams[tls.Epoch.HANDSHAKE]
+        space = self._spaces[tls.Epoch.HANDSHAKE]
+        # packet_type = PACKET_TYPE_HANDSHAKE
+        builder.start_packet(PACKET_TYPE_HANDSHAKE, crypto)
+
+        ack_delay = self._ack_delay
+        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+
+        buf = builder.start_frame(
+            QuicFrameType.ACK,
+            capacity=ACK_FRAME_CAPACITY,
+            handler_args=(space, space.largest_received_packet),
+        )
+        space.ack_queue = RangeSet([range(0, 3)])
+        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        space.ack_at = None
+
+        stream = self._crypto_streams[tls.Epoch.HANDSHAKE]
+        frame_overhead = 3 + size_uint_var(stream.sender.next_offset)
+        frame = stream.sender.get_frame(builder.remaining_flight_space - frame_overhead)
+
+        if frame is not None:
+            buf = builder.start_frame(
+                QuicFrameType.CRYPTO,
+                capacity=frame_overhead,
+                handler=stream.sender.on_data_delivery,
+                handler_args=(frame.offset, frame.offset + len(frame.data), False),
+            )
+            buf.push_uint_var(frame.offset)
+            buf.push_uint16(len(frame.data) | 0x4000)
+            buf.push_bytes(frame.data)
+        datagrams , packets = builder.flush()
+        self._packet_number += 1
         return datagrams
 
         # crypto = self._cryptos[tls.Epoch.HANDSHAKE]
         # space = self._spaces[tls.Epoch.HANDSHAKE]
         # packet_type = PACKET_TYPE_HANDSHAKE
         # builder.start_packet(packet_type, crypto)
+
+    def send_1rtt_packet(self):
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=QuicProtocolVersion.VERSION_1,
+            max_datagram_size=self._max_datagram_size,
+        )
+
+        crypto = self._cryptos[tls.Epoch.ONE_RTT]
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        builder.start_packet(PACKET_TYPE_ONE_RTT, crypto)
+        # the frame data size is constrained by our peer's MAX_DATA and
+        # the space available in the current packet
+        frame_overhead = (
+            3
+            + size_uint_var(stream.stream_id)
+            + (
+                size_uint_var(stream.sender.next_offset)
+                if stream.sender.next_offset
+                else 0
+            )
+        )
+        previous_send_highest = stream.sender.highest_offset
+        frame = stream.sender.get_frame(
+            builder.remaining_flight_space - frame_overhead, max_offset
+        )
+
+        if frame is not None:
+            frame_type = QuicFrameType.STREAM_BASE | 2  # length
+            if frame.offset:
+                frame_type |= 4
+            if frame.fin:
+                frame_type |= 1
+            buf = builder.start_frame(
+                frame_type,
+                capacity=frame_overhead,
+                handler=stream.sender.on_data_delivery,
+                handler_args=(frame.offset, frame.offset + len(frame.data), frame.fin),
+            )
+            buf.push_uint_var(stream.stream_id)
+            if frame.offset:
+                buf.push_uint_var(frame.offset)
+            buf.push_uint16(len(frame.data) | 0x4000)
+            buf.push_bytes(frame.data)
+
+            # log frame
+            if self._quic_logger is not None:
+                builder.quic_logger_frames.append(
+                    self._quic_logger.encode_stream_frame(
+                        frame, stream_id=stream.stream_id
+                    )
+                )
+
+            return stream.sender.highest_offset - previous_send_highest
+        else:
+            return 0
+
+
 
     def connect(self):
         # self._peer_cid.cid = b'12345678'

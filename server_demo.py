@@ -26,10 +26,11 @@ def handle_stream(reader, writer):
 async def run_server(configuration=None, host="::", **kwargs):
     if configuration is None:
         configuration = QuicConfiguration(is_client=False)
+        # configuration.verify_mode = None
         configuration.load_cert_chain(SERVER_CERTFILE, SERVER_KEYFILE)
     server = await serve(
         host=host,
-        port=0,
+        port=10086,
         configuration=configuration,
         stream_handler=handle_stream,
         **kwargs,

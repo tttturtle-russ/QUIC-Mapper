@@ -247,4 +247,5 @@ cython_debug/
 .vs/
 =======
 *.qlog
+*.json
 >>>>>>> Stashed changes
