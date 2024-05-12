@@ -26,8 +26,8 @@ class MyServerProtocol(asyncio.DatagramProtocol):
             for datagram in self.handle.send_initial_ack_packet():
                 self.transmit(datagram, addr)
         if header.packet_type == PACKET_TYPE_HANDSHAKE and self._handshake_done is False:
-            self._handshake_done = True
-            for datagram in self.handle.send_handshake_packet():
+            # self._handshake_done = True
+            for datagram in (self.handle.send_handshake_packet() or []):
                 self.transmit(datagram, addr)
 
         # self.end_trace()

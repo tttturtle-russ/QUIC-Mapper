@@ -863,13 +863,13 @@ class Handle:
             #     self._network_paths.insert(0, network_path)
             #
             # # record packet as received
-            # if not space.discarded:
-            #     if packet_number > space.largest_received_packet:
-            #         space.largest_received_packet = packet_number
-            #         space.largest_received_time = now
-            #     space.ack_queue.add(packet_number)
-            #     if is_ack_eliciting and space.ack_at is None:
-            #         space.ack_at = now + self._ack_delay
+            if not space.discarded:
+                if packet_number > space.largest_received_packet:
+                    space.largest_received_packet = packet_number
+                    space.largest_received_time = now
+                space.ack_queue.add(packet_number)
+                # if is_ack_eliciting and space.ack_at is None:
+                #     space.ack_at = now + self._ack_delay
 
 
 
@@ -2260,7 +2260,7 @@ class Handle:
             capacity=ACK_FRAME_CAPACITY,
             handler_args=(space, space.largest_received_packet),
         )
-        space.ack_queue = RangeSet([range(0, 1)])
+        # space.ack_queue = RangeSet([range(0, 1)])
         ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
         space.ack_at = None
         datagrams , packets = builder.flush()
@@ -2269,6 +2269,8 @@ class Handle:
 
 
     def send_handshake_packet(self):
+        # if self._handshake_confirmed is False:
+        #     return
         builder=QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
@@ -2293,7 +2295,6 @@ class Handle:
             capacity=ACK_FRAME_CAPACITY,
             handler_args=(space, space.largest_received_packet),
         )
-        space.ack_queue = RangeSet([range(0, 3)])
         ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
         space.ack_at = None
 
