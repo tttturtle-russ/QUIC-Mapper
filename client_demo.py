@@ -3,6 +3,7 @@ import socket
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Callable, Optional, cast
 
+from aioquic.quic.connection import *
 from aioquic.quic.configuration import QuicConfiguration
 from receive_data import Handle, QuicTokenHandler
 from aioquic.tls import SessionTicketHandler
@@ -55,6 +56,8 @@ async def connect(
     if len(addr) == 2:
         addr = ("::ffff:" + addr[0], addr[1], 0, 0)
 
+    addr = ("127.0.0.1",10086)
+
     # prepare QUIC connection
     if configuration is None:
         configuration = QuicConfiguration(is_client=True)
@@ -92,3 +95,23 @@ async def connect(
         protocol.close()
         await protocol.wait_closed()
         transport.close()
+
+
+async def main():
+    host = 'localhost'
+    port = 10086
+
+    async with connect(
+        host,
+        port,
+        local_port=10010
+    ) as protocol:
+        # Create a new stream and send data
+        stream_id = protocol._quic.get_next_available_stream_id()
+        protocol._quic.send_stream_data(stream_id, b"Hello, World!", end_stream=True)
+
+        # Wait a bit to ensure data is received
+        await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())

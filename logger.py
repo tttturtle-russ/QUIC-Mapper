@@ -319,9 +319,16 @@ class QuicFileLogger(QuicLogger):
 
     def end_trace(self, trace: QuicLoggerTrace,dcid=b'') -> None:
         trace_dict = trace.to_dict()
-        trace_path = os.path.join(
-            self.path, dcid + '_' + str(datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + ".qlog"
-        )
+        log_folder = os.path.join(self.path, 'log')
+        os.makedirs(log_folder, exist_ok=True)
+
+        # trace_path = os.path.join(
+        #     self.path, dcid + '_' + str(datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + ".qlog"
+        # )
+
+        trace_filename = f"{dcid}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.qlog"
+        trace_path = os.path.join(log_folder, trace_filename)
+
         with open(trace_path, "w") as logger_fp:
             json.dump(
                 {

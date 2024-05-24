@@ -147,6 +147,17 @@ class Limit:
         self.used = 0
         self.value = value
 
+@dataclass
+class QuicNetworkPath:
+    addr: NetworkAddress
+    bytes_received: int = 0
+    bytes_sent: int = 0
+    is_validated: bool = False
+    local_challenge: Optional[bytes] = None
+    remote_challenge: Optional[bytes] = None
+
+    def can_send(self, size: int) -> bool:
+        return self.is_validated or (self.bytes_sent + size) <= 3 * self.bytes_received
 
 @dataclass
 class QuicConnectionId:
@@ -168,7 +179,7 @@ class QuicConnectionState(Enum):
 class QuicReceiveContext:
     epoch: tls.Epoch
     host_cid: bytes
-    # network_path: QuicNetworkPath
+    network_path: QuicNetworkPath
     quic_logger_frames: Optional[List[Any]]
     time: float
 
@@ -289,7 +300,7 @@ class Handle:
         self._local_next_stream_id_uni = 2 if self._is_client else 3
         self._loss_at: Optional[float] = None
         self._max_datagram_size = configuration.max_datagram_size
-        # self._network_paths: List[QuicNetworkPath] = []
+        self._network_paths: List[QuicNetworkPath] = []
         self._pacing_at: Optional[float] = None
         self._packet_number = 0
         self._parameters_received = False
@@ -401,6 +412,12 @@ class Handle:
             0x30: (self._handle_datagram_frame, EPOCHS("01")),
             0x31: (self._handle_datagram_frame, EPOCHS("01")),
         }
+
+    def _find_network_path(self, addr: NetworkAddress) -> QuicNetworkPath:
+        # check existing network paths
+        for idx, network_path in enumerate(self._network_paths):
+            if network_path.addr == addr:
+                return network_path
 
 
     def initialize(self, peer_cid: bytes):
@@ -575,21 +592,20 @@ class Handle:
             #     return
 
             # check destination CID matches
-            # destination_cid_seq: Optional[int] = None
-            # for connection_id in self._host_cids:
-            #     if header.destination_cid == connection_id.cid:
-            #         destination_cid_seq = connection_id.sequence_number
-            #         break
-            # if (
-            #         self._is_client or header.packet_type == PACKET_TYPE_HANDSHAKE
-            # ) and destination_cid_seq is None:
-            #     if self._quic_logger is not None:
-            #         self._quic_logger.log_event(
-            #             category="transport",
-            #             event="packet_dropped",
-            #             data={"trigger": "unknown_connection_id"},
-            #         )
-            # return
+            destination_cid_seq: Optional[int] = None
+            for connection_id in self._host_cids:
+                if header.destination_cid == connection_id.cid:
+                    destination_cid_seq = connection_id.sequence_number
+                    break
+            if (
+                    self._is_client or header.packet_type == PACKET_TYPE_HANDSHAKE
+            ) and destination_cid_seq is None:
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_dropped",
+                        data={"trigger": "unknown_connection_id"},
+                    )
 
             # # check protocol version
             # if (
@@ -712,7 +728,7 @@ class Handle:
             #     return
 
             crypto_frame_required = False
-            # network_path = self._find_network_path(addr)
+            network_path = self._find_network_path(addr)
 
             # determine crypto and packet space
             epoch = get_epoch(header.packet_type)
@@ -810,10 +826,11 @@ class Handle:
             context = QuicReceiveContext(
                 epoch=epoch,
                 host_cid=header.destination_cid,
-                # network_path=network_path,
+                network_path=network_path,
                 quic_logger_frames=quic_logger_frames,
                 time=now,
             )
+            is_ack_eliciting = False
             try:
                 is_ack_eliciting, is_probing = self._payload_received(
                     context, plain_payload, crypto_frame_required=crypto_frame_required
@@ -868,8 +885,8 @@ class Handle:
                     space.largest_received_packet = packet_number
                     space.largest_received_time = now
                 space.ack_queue.add(packet_number)
-                # if is_ack_eliciting and space.ack_at is None:
-                #     space.ack_at = now + self._ack_delay
+                if is_ack_eliciting and space.ack_at is None:
+                    space.ack_at = now + self._ack_delay
 
 
 
@@ -2157,33 +2174,33 @@ class Handle:
 
         return False
 
-    def _write_ack_frame(
-        self, builder: QuicPacketBuilder, space: QuicPacketSpace, now: float
-    ) -> None:
-        # calculate ACK delay
-        ack_delay = now - space.largest_received_time
-        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
-
-        buf = builder.start_frame(
-            QuicFrameType.ACK,
-            capacity=ACK_FRAME_CAPACITY,
-            handler=self._on_ack_delivery,
-            handler_args=(space, space.largest_received_packet),
-        )
-        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
-        space.ack_at = None
-
-        # log frame
-        if self._quic_logger is not None:
-            builder.quic_logger_frames.append(
-                self._quic_logger.encode_ack_frame(
-                    ranges=space.ack_queue, delay=ack_delay
-                )
-            )
-
-        # check if we need to trigger an ACK-of-ACK
-        if ranges > 1 and builder.packet_number % 8 == 0:
-            self._write_ping_frame(builder, comment="ACK-of-ACK trigger")
+    # def _write_ack_frame(
+    #     self, builder: QuicPacketBuilder, space: QuicPacketSpace, now: float
+    # ) -> None:
+    #     # calculate ACK delay
+    #     ack_delay = now - space.largest_received_time
+    #     ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+    #
+    #     buf = builder.start_frame(
+    #         QuicFrameType.ACK,
+    #         capacity=ACK_FRAME_CAPACITY,
+    #         handler=self._on_ack_delivery,
+    #         handler_args=(space, space.largest_received_packet),
+    #     )
+    #     ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+    #     space.ack_at = None
+    #
+    #     # log frame
+    #     if self._quic_logger is not None:
+    #         builder.quic_logger_frames.append(
+    #             self._quic_logger.encode_ack_frame(
+    #                 ranges=space.ack_queue, delay=ack_delay
+    #             )
+    #         )
+    #
+    #     # check if we need to trigger an ACK-of-ACK
+    #     if ranges > 1 and builder.packet_number % 8 == 0:
+    #         self._write_ping_frame(builder, comment="ACK-of-ACK trigger")
 
     def _write_ping_frame(
         self, builder: QuicPacketBuilder, uids: List[int] = [], comment=""
@@ -2212,7 +2229,7 @@ class Handle:
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
-            version=QuicProtocolVersion.VERSION_1,
+            version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
 
@@ -2243,7 +2260,7 @@ class Handle:
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
-            version=QuicProtocolVersion.VERSION_1,
+            version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
 
@@ -2277,7 +2294,7 @@ class Handle:
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
-            version=QuicProtocolVersion.VERSION_1,
+            version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
 
@@ -2328,63 +2345,21 @@ class Handle:
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
-            version=QuicProtocolVersion.VERSION_1,
+            version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
 
         crypto = self._cryptos[tls.Epoch.ONE_RTT]
         space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, crypto)
-        # the frame data size is constrained by our peer's MAX_DATA and
-        # the space available in the current packet
-        frame_overhead = (
-            3
-            + size_uint_var(stream.stream_id)
-            + (
-                size_uint_var(stream.sender.next_offset)
-                if stream.sender.next_offset
-                else 0
-            )
-        )
-        previous_send_highest = stream.sender.highest_offset
-        frame = stream.sender.get_frame(
-            builder.remaining_flight_space - frame_overhead, max_offset
-        )
-
-        if frame is not None:
-            frame_type = QuicFrameType.STREAM_BASE | 2  # length
-            if frame.offset:
-                frame_type |= 4
-            if frame.fin:
-                frame_type |= 1
-            buf = builder.start_frame(
-                frame_type,
-                capacity=frame_overhead,
-                handler=stream.sender.on_data_delivery,
-                handler_args=(frame.offset, frame.offset + len(frame.data), frame.fin),
-            )
-            buf.push_uint_var(stream.stream_id)
-            if frame.offset:
-                buf.push_uint_var(frame.offset)
-            buf.push_uint16(len(frame.data) | 0x4000)
-            buf.push_bytes(frame.data)
-
-            # log frame
-            if self._quic_logger is not None:
-                builder.quic_logger_frames.append(
-                    self._quic_logger.encode_stream_frame(
-                        frame, stream_id=stream.stream_id
-                    )
-                )
-
-            return stream.sender.highest_offset - previous_send_highest
-        else:
-            return 0
+        return builder
 
 
 
-    def connect(self):
+    def connect(self,addr: NetworkAddress):
         # self._peer_cid.cid = b'12345678'
+        self._network_paths = [QuicNetworkPath(addr, is_validated=True)]
+        self._version = self._configuration.supported_versions[0]
         self._initialize(self._peer_cid.cid)
         self.tls.handle_message(b'',self._crypto_buffers)
         self._push_crypto_data()
@@ -2392,7 +2367,192 @@ class Handle:
         # datagrams = self.send_handshake_packet()
         return datagrams
 
+    def _path_challenge_frame(self, builder: QuicPacketBuilder):
+        challenge = os.urandom(8)
+        network_path = self._network_paths[0]
+        network_path.local_challenge = challenge
+        buf = builder.start_frame(
+            QuicFrameType.PATH_CHALLENGE,capacity=PATH_CHALLENGE_FRAME_CAPACITY
+        )
+        buf.push_bytes(challenge)
+        return builder
 
+    def _path_response_frame(self,builder: QuicPacketBuilder):
+        network_path = self._network_paths[0]
+        challenge = network_path.remote_challenge
+        if challenge is None:
+            challenge = os.urandom(8)
+        buf = builder.start_frame(
+            QuicFrameType.PATH_CHALLENGE,capacity=PATH_RESPONSE_FRAME_CAPACITY
+        )
+        buf.push_bytes(challenge)
+        return builder
+
+    def _new_connectionid_frame(self,builder: QuicPacketBuilder):
+        for connection_id in self._host_cids:
+            if connection_id.was_sent is not None:
+                continue
+            retire_prior_to = 0  # FIXME
+
+            buf = builder.start_frame(
+                QuicFrameType.NEW_CONNECTION_ID,
+                capacity=NEW_CONNECTION_ID_FRAME_CAPACITY,
+                handler_args=(connection_id,),
+            )
+            buf.push_uint_var(connection_id.sequence_number)
+            buf.push_uint_var(retire_prior_to)
+            buf.push_uint8(len(connection_id.cid))
+            buf.push_bytes(connection_id.cid)
+            buf.push_bytes(connection_id.stateless_reset_token)
+
+            connection_id.was_sent = True
+        return builder
+
+
+    def send_path_challenge(self):
+        builder = self.send_1rtt_packet()
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        self._write_ack_frame(builder, space)
+        self._path_challenge_frame(builder)
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def send_path_response(self):
+        builder = self.send_1rtt_packet()
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        self._write_ack_frame(builder, space)
+
+        self._path_response_frame(builder)
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def send_new_connectionid(self):
+        builder = self.send_1rtt_packet()
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        self._write_ack_frame(builder, space)
+
+        self._new_connectionid_frame(builder)
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def request_key_update(self) -> None:
+        """
+        Request an update of the encryption keys.
+
+        .. aioquic_transmit::
+        """
+        # assert self._handshake_complete, "cannot change key before handshake completes"
+        self._cryptos[tls.Epoch.ONE_RTT].update_key()
+
+    def send_intitial_close(self):
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=self._version,
+            max_datagram_size=self._max_datagram_size,
+        )
+        space = self._spaces[tls.Epoch.INITIAL]
+
+
+        builder.start_packet(PACKET_TYPE_INITIAL, self._cryptos[tls.Epoch.INITIAL])
+        self._write_ack_frame(builder, space)
+        self._write_connection_close_frame(builder, tls.Epoch.INITIAL, 0, None, "")
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def send_handshake_close(self):
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=self._version,
+            max_datagram_size=self._max_datagram_size,
+        )
+        space = self._spaces[tls.Epoch.HANDSHAKE]
+        builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
+        self._write_ack_frame(builder, space)
+        self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def send_1rtt_close(self):
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=self._version,
+            max_datagram_size=self._max_datagram_size,
+        )
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
+        self._write_ack_frame(builder, space)
+        self._write_connection_close_frame(builder, tls.Epoch.ONE_RTT, 0, None, "")
+        datagrams, packets = builder.flush()
+        return datagrams
+
+    def _write_ack_frame(self, builder, space: QuicPacketSpace):
+        ack_delay = self._ack_delay
+        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+
+        buf = builder.start_frame(
+            QuicFrameType.ACK,
+            capacity=ACK_FRAME_CAPACITY,
+            handler_args=(space, space.largest_received_packet),
+        )
+        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        space.ack_at = None
+
+    def _write_connection_close_frame(
+        self,
+        builder: QuicPacketBuilder,
+        epoch: tls.Epoch,
+        error_code: int,
+        frame_type: Optional[int],
+        reason_phrase: str,
+    ) -> None:
+        # convert application-level close to transport-level close in early stages
+        if frame_type is None and epoch in (tls.Epoch.INITIAL, tls.Epoch.HANDSHAKE):
+            error_code = QuicErrorCode.APPLICATION_ERROR
+            frame_type = QuicFrameType.PADDING
+            reason_phrase = ""
+
+        reason_bytes = reason_phrase.encode("utf8")
+        reason_length = len(reason_bytes)
+
+        if frame_type is None:
+            buf = builder.start_frame(
+                QuicFrameType.APPLICATION_CLOSE,
+                capacity=APPLICATION_CLOSE_FRAME_CAPACITY + reason_length,
+            )
+            buf.push_uint_var(error_code)
+            buf.push_uint_var(reason_length)
+            buf.push_bytes(reason_bytes)
+        else:
+            buf = builder.start_frame(
+                QuicFrameType.TRANSPORT_CLOSE,
+                capacity=TRANSPORT_CLOSE_FRAME_CAPACITY + reason_length,
+            )
+            buf.push_uint_var(error_code)
+            buf.push_uint_var(frame_type)
+            buf.push_uint_var(reason_length)
+            buf.push_bytes(reason_bytes)
+
+        # log frame
+        if self._quic_logger is not None:
+            builder.quic_logger_frames.append(
+                self._quic_logger.encode_connection_close_frame(
+                    error_code=error_code,
+                    frame_type=frame_type,
+                    reason_phrase=reason_phrase,
+                )
+            )
 
     def _serialize_transport_parameters(self) -> bytes:
         quic_transport_parameters = QuicTransportParameters(
