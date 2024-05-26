@@ -36,10 +36,10 @@ class MyServerProtocol(asyncio.DatagramProtocol):
         header = pull_quic_header(buf, 8)
         if self.handle.handshake_confirmed is True:
             self.handshake_done.set()
-        if header.packet_type == PACKET_TYPE_INITIAL:
-            self.send_initial_ack_packet()
-        if header.packet_type == PACKET_TYPE_HANDSHAKE:
-            self.send_handshake_packet()
+        # if header.packet_type == PACKET_TYPE_INITIAL:
+        #     self.send_initial_ack_packet()
+        # if header.packet_type == PACKET_TYPE_HANDSHAKE:
+        #     self.send_handshake_packet()
         # self.end_trace()
 
     def connect(self):

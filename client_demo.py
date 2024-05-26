@@ -22,6 +22,9 @@ async def main():
 
     try:
         protocol.connect()
+        await asyncio.sleep(0.1)
+        protocol.send_initial_ack_packet()
+        protocol.send_handshake_packet()
         await protocol.handshake_done.wait()
         protocol.path_challenge()
         #
@@ -46,6 +49,7 @@ async def main():
         local_addr=("127.0.0.2", 10011))
 
     try:
+        protocol.onertt_ack()
         protocol.path_challenge()
     finally:
         transport_new.close()
