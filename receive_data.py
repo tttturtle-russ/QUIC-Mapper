@@ -267,6 +267,7 @@ class Handle:
         self._events: Deque[events.QuicEvent] = deque()
         self._handshake_complete = False
         self._handshake_confirmed = False
+        self.handshake_confirmed = False
         self._host_cids = [
             QuicConnectionId(
                 cid=os.urandom(configuration.connection_id_length),
@@ -311,7 +312,7 @@ class Handle:
         self._peer_cid_sequence_numbers: Set[int] = set([0])
         self._peer_retire_prior_to = 0
         self._peer_token = configuration.token
-        self._quic_logger = _Quic_file_logger.start_trace()
+        self._quic_logger = configuration.quic_logger.start_trace()
         self._remote_ack_delay_exponent = 3
         # self._remote_active_connection_id_limit = 2
         self._remote_initial_source_connection_id: Optional[bytes] = None
@@ -368,7 +369,7 @@ class Handle:
         # self._handshake_done_pending = False
         # self._ping_pending: List[int] = []
         self._probe_pending = False
-        # self._retire_connection_ids: List[int] = []
+        self._retire_connection_ids: List[int] = []
         # self._streams_blocked_pending = False
         #
         # # callbacks
@@ -424,7 +425,7 @@ class Handle:
         self._initialize(peer_cid=peer_cid)
 
     def end_trace_file(self):
-        _Quic_file_logger.end_trace(self._quic_logger,dump_cid(self._peer_cid.cid))
+        self._configuration.quic_logger.end_trace(self._quic_logger, dump_cid(self._peer_cid.cid))
 
 
     def datagrams_to_send(self, now: float) -> List[Tuple[bytes, NetworkAddress]]:
@@ -1304,8 +1305,9 @@ class Handle:
 
         # for clients, the handshake is now confirmed
         if not self._handshake_confirmed:
-            self._discard_epoch(tls.Epoch.HANDSHAKE)
+            # self._discard_epoch(tls.Epoch.HANDSHAKE)
             self._handshake_confirmed = True
+            self.handshake_confirmed = True
             self._loss.peer_completed_address_validation = True
 
     def _handle_max_data_frame(
@@ -2269,17 +2271,18 @@ class Handle:
         packet_type = PACKET_TYPE_INITIAL
 
         builder.start_packet(packet_type, crypto)
-        ack_delay = self._ack_delay
-        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
-
-        buf = builder.start_frame(
-            QuicFrameType.ACK,
-            capacity=ACK_FRAME_CAPACITY,
-            handler_args=(space, space.largest_received_packet),
-        )
-        # space.ack_queue = RangeSet([range(0, 1)])
-        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
-        space.ack_at = None
+        # ack_delay = self._ack_delay
+        # ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+        #
+        # buf = builder.start_frame(
+        #     QuicFrameType.ACK,
+        #     capacity=ACK_FRAME_CAPACITY,
+        #     handler_args=(space, space.largest_received_packet),
+        # )
+        # # space.ack_queue = RangeSet([range(0, 1)])
+        # ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        # space.ack_at = None
+        self._write_ack_frame(builder, space)
         datagrams , packets = builder.flush()
         self._packet_number += 1
         return datagrams
@@ -2304,16 +2307,17 @@ class Handle:
         # packet_type = PACKET_TYPE_HANDSHAKE
         builder.start_packet(PACKET_TYPE_HANDSHAKE, crypto)
 
-        ack_delay = self._ack_delay
-        ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
-
-        buf = builder.start_frame(
-            QuicFrameType.ACK,
-            capacity=ACK_FRAME_CAPACITY,
-            handler_args=(space, space.largest_received_packet),
-        )
-        ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
-        space.ack_at = None
+        # ack_delay = self._ack_delay
+        # ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
+        #
+        # buf = builder.start_frame(
+        #     QuicFrameType.ACK,
+        #     capacity=ACK_FRAME_CAPACITY,
+        #     handler_args=(space, space.largest_received_packet),
+        # )
+        # ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
+        # space.ack_at = None
+        self._write_ack_frame(builder, space)
 
         stream = self._crypto_streams[tls.Epoch.HANDSHAKE]
         frame_overhead = 3 + size_uint_var(stream.sender.next_offset)
@@ -2352,6 +2356,7 @@ class Handle:
         crypto = self._cryptos[tls.Epoch.ONE_RTT]
         space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, crypto)
+        self._write_ack_frame(builder, space)
         return builder
 
 
@@ -2412,7 +2417,7 @@ class Handle:
     def send_path_challenge(self):
         builder = self.send_1rtt_packet()
         space = self._spaces[tls.Epoch.ONE_RTT]
-        self._write_ack_frame(builder, space)
+        # self._write_ack_frame(builder, space)
         self._path_challenge_frame(builder)
         datagrams, packets = builder.flush()
         return datagrams
@@ -2420,7 +2425,7 @@ class Handle:
     def send_path_response(self):
         builder = self.send_1rtt_packet()
         space = self._spaces[tls.Epoch.ONE_RTT]
-        self._write_ack_frame(builder, space)
+        # self._write_ack_frame(builder, space)
 
         self._path_response_frame(builder)
         datagrams, packets = builder.flush()
@@ -2496,6 +2501,24 @@ class Handle:
         self._write_connection_close_frame(builder, tls.Epoch.ONE_RTT, 0, None, "")
         datagrams, packets = builder.flush()
         return datagrams
+
+    def send_1rrt_ack(self):
+        builder = QuicPacketBuilder(
+            host_cid=self.host_cid,
+            is_client=True,
+            packet_number=self._packet_number,
+            peer_cid=self._peer_cid.cid,
+            peer_token=b'',
+            version=self._version,
+            max_datagram_size=self._max_datagram_size,
+        )
+
+        space = self._spaces[tls.Epoch.ONE_RTT]
+        builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
+        self._write_ack_frame(builder, space)
+        datagrams, packets = builder.flush()
+        return datagrams
+
 
     def _write_ack_frame(self, builder, space: QuicPacketSpace):
         ack_delay = self._ack_delay
