@@ -17,6 +17,7 @@ SERVER_COMBINEDFILE = os.path.join(os.getcwd(), "vertify", "ssl_combined.pem")
 def handle_stream(reader, writer):
     async def serve():
         data = await reader.read()
+        print(reader)
         writer.write(bytes(reversed(data)))
         writer.write_eof()
 
@@ -41,7 +42,7 @@ async def run_server(configuration=None, host="::", **kwargs):
         server.close()
 
 async def main():
-    async with run_server() as port:
+    async with run_server(host="127.0.0.1") as port:
         print(f"Server is running on port {port}")
         # 这里可以插入你的代码，例如等待用户输入或者处理其他事件
         await asyncio.sleep(3600)  # 例如，让服务器运行一小时

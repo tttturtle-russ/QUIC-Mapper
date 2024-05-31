@@ -7,7 +7,7 @@ from aioquic.quic.configuration import QuicConfiguration
 
 QUANT_SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "dummy.ca.crt")
 
-async def start_quic_server(destination_addr, local_addr, handle):
+async def start_quic_client(destination_addr, local_addr, handle):
     loop = asyncio.get_running_loop()
     # configuration = QuicConfiguration()
     # configuration.supported_versions = [QuicProtocolVersion.VERSION_1]
@@ -17,14 +17,14 @@ async def start_quic_server(destination_addr, local_addr, handle):
     # handle = Handle(configuration=configuration)
 
     transport, protocol = await loop.create_datagram_endpoint(
-        lambda: MyServerProtocol(destination_addr, handle),
+        lambda: QUICClientProtocol(destination_addr, handle),
         local_addr=local_addr)
     return transport, protocol
 
 
 async def main():
     # loop = asyncio.get_running_loop()
-    addr = ("172.17.0.2", 4433)
+    addr = ("127.0.0.1", 4433)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1] # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=QUANT_SERVER_CACERTFILE) # CA certificate can be changed
@@ -32,16 +32,16 @@ async def main():
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = ("172.17.0.1", 10011)
-    transport, protocol = await start_quic_server(addr, local_addr, handle)
+    local_addr = ("127.0.0.2", 10011)
+    transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
 
     try:
         protocol.connect()
         await asyncio.sleep(0.1)
-        protocol.send_initial_ack_packet()
+        protocol.initial_ack_packet()
         protocol.initial_close()
-        protocol.send_handshake_packet()
+        protocol.handshake_packet()
 
         await asyncio.sleep(0.1)
         # protocol.send_handshake_packet()

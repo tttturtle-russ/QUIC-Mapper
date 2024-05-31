@@ -5,7 +5,7 @@ from receive_data import *
 
 
 
-class MyServerProtocol(asyncio.DatagramProtocol):
+class QUICClientProtocol(asyncio.DatagramProtocol):
     def __init__(self, addr, handle):
         self.transport = None
         self.handle = handle
@@ -17,14 +17,14 @@ class MyServerProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
 
-    def send_initial_ack_packet(self):
+    def initial_ack_packet(self):
         addr = self._addr
-        for datagram in self.handle.send_initial_ack_packet():
+        for datagram in self.handle.initial_ack_packet():
             self.transmit(datagram, addr)
 
-    def send_handshake_packet(self):
+    def handshake_packet(self):
         addr = self._addr
-        for datagram in self.handle.send_handshake_packet():
+        for datagram in self.handle.handshake_packet():
             self.transmit(datagram, addr)
 
     def datagram_received(self, data, addr):
@@ -49,10 +49,6 @@ class MyServerProtocol(asyncio.DatagramProtocol):
 
     def transmit(self, data, addr):
         self.transport.sendto(data, addr)
-
-    def handshake_packet(self):
-        for data in self.handle.handshake_packet():
-            self.transmit(data, self._addr)
 
     def path_challenge(self):
         for data in self.handle.send_path_challenge():

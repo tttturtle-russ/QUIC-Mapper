@@ -1,3 +1,4 @@
+import asyncio
 import os
 import struct
 
@@ -7,6 +8,41 @@ from scapy.layers.tls.cert import Cert, PrivKey, PrivKeyRSA
 
 from stubs.client import TLSClient
 from stubs.cke_factory import CKEFactory
+
+from protocol import QUICClientProtocol
+
+class QUICClientInferTool:
+    def __init__(self, dst_addr, local_addr, handle):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.transport = None
+        self.protocol = None
+        self.loop.run_until_complete(self.async_init(dst_addr, handle))
+        self.local_endpoint = local_addr
+
+    async def async_init(self, dst_addr, handle):
+        loop = asyncio.get_running_loop()
+        self.transport, self.protocol = await loop.create_datagram_endpoint(
+            lambda: QUICClientProtocol(dst_addr, handle)
+        )
+
+    def concretize_client_messages(self, symbols):
+        func_map = {
+            "ConnectInitial": self.protocol.connect,
+            "HandshakeInitial": self.protocol.initial_ack_packet,
+            "Handshake": self.protocol.handshake_packet,
+            "PathChallenge": self.protocol.path_challenge,
+            "PathResponse": self.protocol.path_response,
+            "InitialClose": self.protocol.initial_close,
+            "HandshakeClose": self.protocol.handshake_close,
+            "OneRTTClose": self.protocol.onertt_close,
+            "NewConnectionID": self.protocol.new_connection_id,
+        }
+        for symbol in symbols:
+            func = func_map.get(symbol, None)
+            if func is None:
+                raise ValueError(f"Unknown vocabulary :: {symbol}")
+            func()
 
 
 class InfererTools:
