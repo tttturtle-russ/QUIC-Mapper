@@ -1,5 +1,6 @@
 import asyncio
 import os
+import socket
 import struct
 
 from scapy.layers.tls.handshake import TLSClientHello
@@ -19,15 +20,15 @@ class QUICClientInferTool:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.transport = None
-        self.protocol = None
-        self.loop.run_until_complete(self.async_init(dst_addr, handle))
+        self.protocol = QUICClientProtocol(dst_addr, local_addr, handle)
         self.local_endpoint = local_addr
 
-    async def async_init(self, dst_addr, handle):
-        loop = asyncio.get_running_loop()
-        self.transport, self.protocol = await loop.create_datagram_endpoint(
-            lambda: QUICClientProtocol(dst_addr, handle)
-        )
+
+    # async def async_init(self, dst_addr, handle):
+    #     loop = asyncio.get_running_loop()
+    #     self.transport, self.protocol = await loop.create_datagram_endpoint(
+    #         lambda: QUICClientProtocol(dst_addr, handle)
+    #     )
 
     def concretize_client_messages(self, symbols):
         func_map = {
