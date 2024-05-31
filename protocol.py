@@ -12,6 +12,7 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
         self._handshake_confirm = False
         self.handshake_done = asyncio.Event()
         self._addr = addr
+        self._packet_receive_event = asyncio.Event()
         # self.handle.connect()
 
     def connection_made(self, transport):
@@ -21,6 +22,7 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
         addr = self._addr
         for datagram in self.handle.send_initial_ack_packet():
             self.transmit(datagram, addr)
+            self.wait_for_packet()
 
     def handshake_packet(self):
         addr = self._addr
@@ -30,6 +32,7 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         # 使用你已有的 datagram_received 函数
         # data_pre = data
+        self._packet_receive_event.set()
         self.handle.receive_datagram(data, addr, now=0.0)
         # print("data received")
         buf = Buffer(data=data)
@@ -45,10 +48,12 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
     def connect(self):
         addr = self._addr
         for datagram in self.handle.connect(addr):
-            self.transport.sendto(datagram, addr)
+            self.transmit(datagram, addr)
+
 
     def transmit(self, data, addr):
         self.transport.sendto(data, addr)
+        self.wait_for_packet()
 
     def path_challenge(self):
         for data in self.handle.send_path_challenge():
@@ -81,6 +86,8 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
     def end_trace(self):
         self.handle.end_trace_file()
 
-
+    def wait_for_packet(self):
+        self._packet_receive_event.clear()
+        asyncio.get_event_loop().run_until_complete(self._packet_receive_event.wait())
 
 
