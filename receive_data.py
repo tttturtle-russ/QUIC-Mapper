@@ -84,7 +84,7 @@ CONNECTION_LIMIT_FRAME_CAPACITY = 1 + UINT_VAR_MAX_SIZE
 HANDSHAKE_DONE_FRAME_CAPACITY = 1
 MAX_STREAM_DATA_FRAME_CAPACITY = 1 + 2 * UINT_VAR_MAX_SIZE
 NEW_CONNECTION_ID_FRAME_CAPACITY = (
-    1 + 2 * UINT_VAR_MAX_SIZE + 1 + CONNECTION_ID_MAX_SIZE + STATELESS_RESET_TOKEN_SIZE
+        1 + 2 * UINT_VAR_MAX_SIZE + 1 + CONNECTION_ID_MAX_SIZE + STATELESS_RESET_TOKEN_SIZE
 )
 PATH_CHALLENGE_FRAME_CAPACITY = 1 + 8
 PATH_RESPONSE_FRAME_CAPACITY = 1 + 8
@@ -119,6 +119,7 @@ EPOCH_SHORTCUTS = {
     "1": tls.Epoch.ONE_RTT,
 }
 
+
 def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
     if is_draft_version(version):
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS_DRAFT
@@ -147,6 +148,7 @@ class Limit:
         self.used = 0
         self.value = value
 
+
 @dataclass
 class QuicNetworkPath:
     addr: NetworkAddress
@@ -159,6 +161,7 @@ class QuicNetworkPath:
     def can_send(self, size: int) -> bool:
         return self.is_validated or (self.bytes_sent + size) <= 3 * self.bytes_received
 
+
 @dataclass
 class QuicConnectionId:
     cid: bytes
@@ -166,13 +169,13 @@ class QuicConnectionId:
     stateless_reset_token: bytes = b""
     was_sent: bool = False
 
+
 class QuicConnectionState(Enum):
     FIRSTFLIGHT = 0
     CONNECTED = 1
     CLOSING = 2
     DRAINING = 3
     TERMINATED = 4
-
 
 
 @dataclass
@@ -202,13 +205,13 @@ def get_epoch(packet_type: int) -> tls.Epoch:
     else:
         return tls.Epoch.ONE_RTT
 
+
 class QuicConnectionAdapter(logging.LoggerAdapter):
     def process(self, msg: str, kwargs: Any) -> Tuple[str, Any]:
         return "[%s] %s" % (self.extra["id"], msg), kwargs
 
 
 QuicTokenHandler = Callable[[bytes], None]
-
 
 # END_STATES = frozenset(
 #     [
@@ -221,12 +224,12 @@ QuicTokenHandler = Callable[[bytes], None]
 _Quic_logger = QuicLogger()
 _Quic_file_logger = QuicFileLogger(os.getcwd())
 
+
 def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
     if is_draft_version(version):
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS_DRAFT
     else:
         return tls.ExtensionType.QUIC_TRANSPORT_PARAMETERS
-
 
 
 class Handle:
@@ -420,13 +423,11 @@ class Handle:
             if network_path.addr == addr:
                 return network_path
 
-
     def initialize(self, peer_cid: bytes):
         self._initialize(peer_cid=peer_cid)
 
     def end_trace_file(self):
         self._configuration.quic_logger.end_trace(self._quic_logger, dump_cid(self._peer_cid.cid))
-
 
     def datagrams_to_send(self, now: float) -> List[Tuple[bytes, NetworkAddress]]:
         """
@@ -837,13 +838,13 @@ class Handle:
                     context, plain_payload, crypto_frame_required=crypto_frame_required
                 )
             except QuicConnectionError as exc:
-                # self._logger.warning(exc)
+                self._logger.warning(exc)
                 # self.close(
                 #     error_code=exc.error_code,
                 #     frame_type=exc.frame_type,
                 #     reason_phrase=exc.reason_phrase,
                 # )
-                print("connection error\n")
+                # print("connection error\n")
             print(("data_received\n"))
             # if self._state in END_STATES or self._close_pending:
             #     return
@@ -888,9 +889,6 @@ class Handle:
                 space.ack_queue.add(packet_number)
                 if is_ack_eliciting and space.ack_at is None:
                     space.ack_at = now + self._ack_delay
-
-
-
 
     def _payload_received(
             self,
@@ -1141,7 +1139,7 @@ class Handle:
                 frame_type=frame_type,
                 reason_phrase=reason_phrase,
             )
-            self._close_begin(is_initiator=False, now=context.time)
+            # self._close_begin(is_initiator=False, now=context.time)
 
     def _handle_crypto_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -1854,7 +1852,6 @@ class Handle:
                 )
             )
 
-
     def _log_key_updated(self, key_type: str, trigger: str) -> None:
         """
         Log a key update.
@@ -1881,11 +1878,11 @@ class Handle:
             )
 
     def _update_traffic_key(
-        self,
-        direction: tls.Direction,
-        epoch: tls.Epoch,
-        cipher_suite: tls.CipherSuite,
-        secret: bytes,
+            self,
+            direction: tls.Direction,
+            epoch: tls.Epoch,
+            cipher_suite: tls.CipherSuite,
+            secret: bytes,
     ) -> None:
         """
         Callback which is invoked by the TLS engine when new traffic keys are
@@ -1963,15 +1960,15 @@ class Handle:
                     )
 
         if not from_session_ticket:
-            if (
-                    quic_transport_parameters.initial_source_connection_id
-                    != self._remote_initial_source_connection_id
-            ):
-                raise QuicConnectionError(
-                    error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
-                    frame_type=QuicFrameType.CRYPTO,
-                    reason_phrase="initial_source_connection_id does not match",
-                )
+            # if (
+            #         quic_transport_parameters.initial_source_connection_id
+            #         != self._remote_initial_source_connection_id
+            # ):
+            #     raise QuicConnectionError(
+            #         error_code=QuicErrorCode.TRANSPORT_PARAMETER_ERROR,
+            #         frame_type=QuicFrameType.CRYPTO,
+            #         reason_phrase="initial_source_connection_id does not match",
+            #     )
             if self._is_client and (
                     quic_transport_parameters.original_destination_connection_id
                     != self._original_destination_connection_id
@@ -2071,14 +2068,14 @@ class Handle:
 
     def _handle_session_ticket(self, session_ticket: tls.SessionTicket) -> None:
         if (
-            session_ticket.max_early_data_size is not None
-            and session_ticket.max_early_data_size != MAX_EARLY_DATA
+                session_ticket.max_early_data_size is not None
+                and session_ticket.max_early_data_size != MAX_EARLY_DATA
         ):
             raise QuicConnectionError(
                 error_code=QuicErrorCode.PROTOCOL_VIOLATION,
                 frame_type=QuicFrameType.CRYPTO,
                 reason_phrase="Invalid max_early_data value %s"
-                % session_ticket.max_early_data_size,
+                              % session_ticket.max_early_data_size,
             )
         self._session_ticket_handler(session_ticket)
 
@@ -2152,7 +2149,7 @@ class Handle:
                 break
 
     def _write_crypto_frame(
-        self, builder: QuicPacketBuilder, space: QuicPacketSpace, stream: QuicStream
+            self, builder: QuicPacketBuilder, space: QuicPacketSpace, stream: QuicStream
     ) -> bool:
         frame_overhead = 3 + size_uint_var(stream.sender.next_offset)
         frame = stream.sender.get_frame(builder.remaining_flight_space - frame_overhead)
@@ -2205,7 +2202,7 @@ class Handle:
     #         self._write_ping_frame(builder, comment="ACK-of-ACK trigger")
 
     def _write_ping_frame(
-        self, builder: QuicPacketBuilder, uids: List[int] = [], comment=""
+            self, builder: QuicPacketBuilder, uids: List[int] = [], comment=""
     ):
         builder.start_frame(
             QuicFrameType.PING,
@@ -2225,7 +2222,7 @@ class Handle:
 
     def send_initial_packet(self):
 
-        builder=QuicPacketBuilder(
+        builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
             packet_number=self._packet_number,
@@ -2256,7 +2253,7 @@ class Handle:
         return datagrams
 
     def send_initial_ack_packet(self):
-        builder=QuicPacketBuilder(
+        builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
             packet_number=self._packet_number,
@@ -2266,7 +2263,7 @@ class Handle:
             max_datagram_size=self._max_datagram_size,
         )
 
-        crypto =self._cryptos[tls.Epoch.INITIAL]
+        crypto = self._cryptos[tls.Epoch.INITIAL]
         space = self._spaces[tls.Epoch.INITIAL]
         packet_type = PACKET_TYPE_INITIAL
 
@@ -2283,15 +2280,14 @@ class Handle:
         # ranges = push_ack_frame(buf, space.ack_queue, ack_delay_encoded)
         # space.ack_at = None
         self._write_ack_frame(builder, space)
-        datagrams , packets = builder.flush()
+        datagrams, packets = builder.flush()
         self._packet_number += 1
         return datagrams
-
 
     def send_handshake_packet(self):
         # if self._handshake_confirmed is False:
         #     return
-        builder=QuicPacketBuilder(
+        builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
             packet_number=self._packet_number,
@@ -2333,7 +2329,7 @@ class Handle:
             buf.push_uint_var(frame.offset)
             buf.push_uint16(len(frame.data) | 0x4000)
             buf.push_bytes(frame.data)
-        datagrams , packets = builder.flush()
+        datagrams, packets = builder.flush()
         self._packet_number += 1
         return datagrams
 
@@ -2359,14 +2355,12 @@ class Handle:
         self._write_ack_frame(builder, space)
         return builder
 
-
-
-    def connect(self,addr: NetworkAddress):
+    def connect(self, addr: NetworkAddress):
         # self._peer_cid.cid = b'12345678'
         self._network_paths = [QuicNetworkPath(addr, is_validated=True)]
         self._version = self._configuration.supported_versions[0]
         self._initialize(self._peer_cid.cid)
-        self.tls.handle_message(b'',self._crypto_buffers)
+        self.tls.handle_message(b'', self._crypto_buffers)
         self._push_crypto_data()
         datagrams = self.send_initial_packet()
         # datagrams = self.send_handshake_packet()
@@ -2377,23 +2371,23 @@ class Handle:
         network_path = self._network_paths[0]
         network_path.local_challenge = challenge
         buf = builder.start_frame(
-            QuicFrameType.PATH_CHALLENGE,capacity=PATH_CHALLENGE_FRAME_CAPACITY
+            QuicFrameType.PATH_CHALLENGE, capacity=PATH_CHALLENGE_FRAME_CAPACITY
         )
         buf.push_bytes(challenge)
         return builder
 
-    def _path_response_frame(self,builder: QuicPacketBuilder):
+    def _path_response_frame(self, builder: QuicPacketBuilder):
         network_path = self._network_paths[0]
         challenge = network_path.remote_challenge
         if challenge is None:
             challenge = os.urandom(8)
         buf = builder.start_frame(
-            QuicFrameType.PATH_CHALLENGE,capacity=PATH_RESPONSE_FRAME_CAPACITY
+            QuicFrameType.PATH_CHALLENGE, capacity=PATH_RESPONSE_FRAME_CAPACITY
         )
         buf.push_bytes(challenge)
         return builder
 
-    def _new_connectionid_frame(self,builder: QuicPacketBuilder):
+    def _new_connectionid_frame(self, builder: QuicPacketBuilder):
         for connection_id in self._host_cids:
             if connection_id.was_sent is not None:
                 continue
@@ -2412,7 +2406,6 @@ class Handle:
 
             connection_id.was_sent = True
         return builder
-
 
     def send_path_challenge(self):
         builder = self.send_1rtt_packet()
@@ -2449,7 +2442,7 @@ class Handle:
         # assert self._handshake_complete, "cannot change key before handshake completes"
         self._cryptos[tls.Epoch.ONE_RTT].update_key()
 
-    def send_intitial_close(self):
+    def send_initial_close(self):
         builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
@@ -2460,7 +2453,6 @@ class Handle:
             max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.INITIAL]
-
 
         builder.start_packet(PACKET_TYPE_INITIAL, self._cryptos[tls.Epoch.INITIAL])
         self._write_ack_frame(builder, space)
@@ -2519,8 +2511,9 @@ class Handle:
         datagrams, packets = builder.flush()
         return datagrams
 
-
     def _write_ack_frame(self, builder, space: QuicPacketSpace):
+        if space.ack_at is None:
+            return
         ack_delay = self._ack_delay
         ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
 
@@ -2533,12 +2526,12 @@ class Handle:
         space.ack_at = None
 
     def _write_connection_close_frame(
-        self,
-        builder: QuicPacketBuilder,
-        epoch: tls.Epoch,
-        error_code: int,
-        frame_type: Optional[int],
-        reason_phrase: str,
+            self,
+            builder: QuicPacketBuilder,
+            epoch: tls.Epoch,
+            error_code: int,
+            frame_type: Optional[int],
+            reason_phrase: str,
     ) -> None:
         # convert application-level close to transport-level close in early stages
         if frame_type is None and epoch in (tls.Epoch.INITIAL, tls.Epoch.HANDSHAKE):

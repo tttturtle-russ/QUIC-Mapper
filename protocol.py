@@ -3,7 +3,7 @@ from aioquic.quic.packet import *
 from aioquic.buffer import *
 from receive_data import *
 
-SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
+
 
 class MyServerProtocol(asyncio.DatagramProtocol):
     def __init__(self, addr, handle):
