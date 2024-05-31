@@ -221,8 +221,8 @@ QuicTokenHandler = Callable[[bytes], None]
 #     ]
 # )
 
-_Quic_logger = QuicLogger()
-_Quic_file_logger = QuicFileLogger(os.getcwd())
+# _Quic_logger = QuicLogger()
+# _Quic_file_logger = QuicFileLogger(os.getcwd())
 
 
 def get_transport_parameters_extension(version: int) -> tls.ExtensionType:
@@ -339,7 +339,7 @@ class Handle:
         # self._streams_blocked_bidi: List[QuicStream] = []
         # self._streams_blocked_uni: List[QuicStream] = []
         # self._streams_finished: Set[int] = set()
-        self._version: Optional[int] = QuicProtocolVersion.VERSION_1
+        self._version: Optional[int] = configuration.supported_versions[0]
         self._version_negotiation_count = 0
 
         if self._is_client:
@@ -927,12 +927,12 @@ class Handle:
                 )
 
             # check frame type is allowed for the epoch
-            if context.epoch not in frame_epochs:
-                raise QuicConnectionError(
-                    error_code=QuicErrorCode.PROTOCOL_VIOLATION,
-                    frame_type=frame_type,
-                    reason_phrase="Unexpected frame type",
-                )
+            # if context.epoch not in frame_epochs:
+            #     raise QuicConnectionError(
+            #         error_code=QuicErrorCode.PROTOCOL_VIOLATION,
+            #         frame_type=frame_type,
+            #         reason_phrase="Unexpected frame type",
+            #     )
 
             # handle the frame
             try:

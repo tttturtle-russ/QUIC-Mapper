@@ -19,12 +19,12 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
 
     def initial_ack_packet(self):
         addr = self._addr
-        for datagram in self.handle.initial_ack_packet():
+        for datagram in self.handle.send_initial_ack_packet():
             self.transmit(datagram, addr)
 
     def handshake_packet(self):
         addr = self._addr
-        for datagram in self.handle.handshake_packet():
+        for datagram in self.handle.send_handshake_packet():
             self.transmit(datagram, addr)
 
     def datagram_received(self, data, addr):
@@ -80,6 +80,7 @@ class QUICClientProtocol(asyncio.DatagramProtocol):
 
     def end_trace(self):
         self.handle.end_trace_file()
+
 
 
 
