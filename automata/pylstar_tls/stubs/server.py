@@ -335,13 +335,13 @@ class TLSServer(_TLSAutomaton):
         self.msg_to_send = b"".join(msg)
 
         if self.selected_cipher_suite and "TLS12ServerHello_RSA_EXPORT" in symbols:
-            self.socket.send(
+            self.socket.send_and_receive(
                 self.msg_to_send[:44]
                 + struct.pack(">H", self.selected_cipher_suite)
                 + self.msg_to_send[46:]
             )
         else:
-            self.socket.send(self.msg_to_send)
+            self.socket.send_and_receive(self.msg_to_send)
         self.buffer_out = []
 
     def vprint_sessioninfo(self):

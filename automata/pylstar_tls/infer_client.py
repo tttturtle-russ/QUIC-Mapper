@@ -74,7 +74,7 @@ class TLSClientKnowledgeBase(ActiveKnowledgeBase):
         host, port = self.options.local_endpoint.as_tuple()
         trigger_string = f"{host} {port}\n".encode("utf8")
         if self.client_trigger:
-            self.client_trigger.send(trigger_string)
+            self.client_trigger.send_and_receive(trigger_string)
             try:
                 _ = self.client_trigger.recv(8192, socket.MSG_DONTWAIT)
             except BlockingIOError:

@@ -6,6 +6,8 @@ import sys
 import time
 import logging
 
+from aioquic.quic.configuration import QuicConfiguration
+from aioquic.quic.packet import QuicProtocolVersion
 from pylstar.LSTAR import LSTAR
 from pylstar.ActiveKnowledgeBase import ActiveKnowledgeBase
 from pylstar.Letter import Letter
@@ -13,6 +15,8 @@ from pylstar.Word import Word
 
 import config.scenarios
 import tls_args
+from logger import QuicFileLogger
+from receive_data import Handle
 from utils import (
     fill_answer_with,
     get_expected_output,
@@ -88,22 +92,26 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         except Exception:
             return "INTERNAL ERROR DURING EMISSION"
 
-        try:
-            response = read_next_msg(self.tls_session, timeout=real_timeout)
-            if response is None:
-                return "EOF"
-            if not response:
-                return "No RSP"
+        last_events = self.tool.logger.last_events()
 
-            while expected_output is None or expected_output != "+".join(response):
-                next_msg = read_next_msg(self.tls_session, timeout=self.options.timeout)
-                if not next_msg:  # Covers next_msg is None and next_msg = []
-                    break
-                response += next_msg
-            return "+".join(response)
-        # pylint: disable=broad-except
-        except Exception:
-            return "INTERNAL ERROR DURING RECEPTION"
+        try:
+            event = last_events.popleft()
+            data = event["data"]
+            response = [f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"]
+        except IndexError:
+            return ""
+
+        for event in last_events:
+            if expected_output is not None:
+                break
+            if "+".join(response) == expected_output:
+                return expected_output
+            data = event["data"]
+            response.append(
+                f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}")
+
+        return "+".join(response)
+
 
 class TLSServerKnowledgeBase(ActiveKnowledgeBase):
     def __init__(self, tls_version, options):
@@ -169,7 +177,7 @@ class TLSServerKnowledgeBase(ActiveKnowledgeBase):
             self.tools.concretize_client_messages(self.tls_session, symbols)
             if symbols == {"TLSHardCodedFinished"}:
                 raw_client_finished = b"\x16\x03\x01\x00\x40" + (b"\xff" * 64)
-                self.tls_session.socket.send(raw_client_finished)
+                self.tls_session.socket.send_and_receive(raw_client_finished)
             else:
                 self.tls_session.flush_records()
         except BrokenPipeError:
@@ -241,6 +249,15 @@ def main():
 
     TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
 
+    SERVER_CACERTFILE = os.path.join(os.getcwd(), "..", "..", "vertify", "pycacert.pem")
+    configuration = QuicConfiguration()
+    configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
+    configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
+    quic_logger = QuicFileLogger(os.getcwd())
+    configuration.quic_logger = quic_logger
+    handle = Handle(configuration=configuration)
+    QUICBase = QUICServerKnowledgeBase(("127.0.0.1", 10086), ("127.0.0.1", 10011), handle, options=args)
+
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
     logging.getLogger("RandomWalkMethod").setLevel(logging.DEBUG)
     logging.getLogger("BDistMethod").setLevel(logging.DEBUG)
@@ -252,7 +269,8 @@ def main():
 
         if args.messages:
             input_sequence = Word(letters=[Letter(m) for m in args.messages])
-            output_sequence = TLSBase._resolve_word(input_sequence)
+            output_sequence = QUICBase._resolve_word(input_sequence)
+            # output_sequence = TLSBase._resolve_word(input_sequence)
             output = [list(l.symbols)[0] for l in output_sequence.letters]
             last_output = output
             repetitions = 1
@@ -262,7 +280,8 @@ def main():
             sys.stdout.flush()
 
             for _i in range(1, args.loops):
-                output_sequence = TLSBase._execute_word(input_sequence)
+                # output_sequence = TLSBase._execute_word(input_sequence)
+                output_sequence = QUICBase._execute_word(input_sequence)
                 output = [list(l.symbols)[0] for l in output_sequence.letters]
 
                 if output == last_output:
@@ -287,7 +306,8 @@ def main():
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
 
-        eqtests = args.eq_method((TLSBase, input_letters))
+        eqtests = args.eq_method((QUICBase, input_letters))
+        # eqtests = args.eq_method((TLSBase, input_letters))
         if not args.disable_happy_path_first and scenario.interesting_paths:
             interesting_paths_with_letters = [
                 [Letter(s) for s in path] for path in scenario.interesting_paths

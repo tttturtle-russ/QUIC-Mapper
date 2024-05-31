@@ -119,7 +119,6 @@ def fill_answer_with(prefix: List[Letter], symbol: str, length: int) -> List[Let
         letters.append(Letter(symbol))
     return letters
 
-
 def get_expected_output(
     input_word: Word, knowledge_tree: KnowledgeTree
 ) -> List[Letter]:

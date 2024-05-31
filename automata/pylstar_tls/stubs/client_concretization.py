@@ -11,8 +11,11 @@ from stubs.cke_factory import CKEFactory
 
 from protocol import QUICClientProtocol
 
+
 class QUICClientInferTool:
-    def __init__(self, dst_addr, local_addr, handle):
+    def __init__(self, configuration, dst_addr, local_addr, handle):
+        self.handle = handle
+        self.logger = configuration.quic_logger
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.transport = None

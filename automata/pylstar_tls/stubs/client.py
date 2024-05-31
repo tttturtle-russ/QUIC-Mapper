@@ -363,7 +363,7 @@ class TLSClient(_TLSAutomaton):
         self.msg_to_send = b"".join(p.raw_stateful() for p in self.buffer_out)
         if self.msg_to_send is None or self.msg_to_send == "":
             return False
-        self.socket.send(self.msg_to_send)
+        self.socket.send_and_receive(self.msg_to_send)
         self.buffer_out = []
         return True
 
