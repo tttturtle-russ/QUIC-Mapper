@@ -25,7 +25,7 @@ async def new_connection(old_transport, destination_addr, new_local_addr, handle
 
 async def main():
     # loop = asyncio.get_running_loop()
-    addr = ("172.17.0.2", 4433)
+    addr = ("127.0.0.1", 10086)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1] # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=QUANT_SERVER_CACERTFILE) # CA certificate can be changed
@@ -33,7 +33,7 @@ async def main():
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = ("172.17.0.1", 10011)
+    local_addr = ("127.0.0.1", 10011)
     transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
 

@@ -1,113 +1,156 @@
-import asyncio
-import datetime
-import functools
-import ipaddress
-import logging
-import os
+from typing import List, Dict, Tuple, Optional
+import socket
 
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from pylstar.Letter import Letter
+from pylstar.Word import Word
+from pylstar.KnowledgeTree import KnowledgeTree
+
+# from scapy.layers.tls.record import TLSAlert, _tls_alert_description
 
 
-def asynctest(coro):
-    @functools.wraps(coro)
-    def wrap(*args, **kwargs):
-        asyncio.run(coro(*args, **kwargs))
+# class Endpoint:
+#     def __init__(self, endpoint_str: str):
+#         self._host, port_str = endpoint_str.split(":")
+#         self._port = int(port_str)
+#
+#     def check(self) -> bool:
+#         try:
+#             socket.getaddrinfo(self._host, self._port)
+#             return True
+#         except socket.gaierror:
+#             return False
+#
+#     def __str__(self):
+#         return f"{self._host}:{self._port}"
+#
+#     def as_tuple(self):
+#         return self._host, self._port
+#
+#
+# class InvalidCryptoMaterialLine(BaseException):
+#     pass
+#
+#
+# class CryptoMaterial:
+#     def __init__(self):
+#         self.material: Dict[str, Tuple[str, str]] = {}
+#         self.default_cert: Optional[str] = None
+#
+#     def add(self, arg_line):
+#         elts = arg_line.split(":")
+#         if len(elts) == 3:
+#             elts.append(False)
+#         elif len(elts) == 4 and elts[3] == "DEFAULT":
+#             elts[3] = True
+#         else:
+#             raise InvalidCryptoMaterialLine
+#
+#         name, cert, key, default_cert = elts
+#         self.material[name] = (cert, key)
+#         if default_cert:
+#             self.default_cert = name
+#
+#     def iter_names(self):
+#         for name in self.material:
+#             yield name
+#
+#     def iter_non_default_names(self):
+#         for name in self.material:
+#             if name != self.default_cert:
+#                 yield name
+#
+#     def default_material(self) -> Tuple[Optional[str], Optional[str]]:
+#         if self.default_cert:
+#             return self.material[self.default_cert]
+#         return None, None
+#
+#     def get_material(self, name: str) -> Tuple[str, str]:
+#         return self.material[name]
+#
+#     def __nonzero__(self):
+#         return bool(self.material)
+#
+#
+# def abstract_alert_message(alert: TLSAlert):
+#     if alert.level == 1:
+#         alert_level = "Warning"
+#     elif alert.level == 2:
+#         alert_level = "FatalAlert"
+#     else:
+#         return "UnknownPacket"
+#     try:
+#         return f"{alert_level}({_tls_alert_description[alert.descr]})"
+#     except KeyError:
+#         return "UnknownPacket"
+#
+#
+# def abstract_response(response):
+#     msg_type = []
+#     for rsp in response:
+#         try:
+#             # If rsp.load exists, it means that scapy was not able to parse the packet correctly
+#             _ = rsp.load
+#             msg_type.append("UnknownPacket")
+#             continue
+#         except AttributeError:
+#             pass
+#         if isinstance(rsp, TLSAlert):
+#             msg_type.append(abstract_alert_message(rsp))
+#         else:
+#             abstract_msg = str(type(rsp)).rsplit(".", maxsplit=1)[-1].replace("'>", "")
+#             if abstract_msg == "Raw":
+#                 abstract_msg = "UnknownPacket"
+#             elif abstract_msg == "TLSApplicationData":
+#                 # If scapy interprets a packet as ApplicationData, check if the data makes sense
+#                 try:
+#                     rsp.data.decode("utf-8")
+#                 except UnicodeDecodeError:
+#                     abstract_msg = "UnknownPacket"
+#             msg_type.append(abstract_msg)
+#         if "UnknownPacket" in msg_type:
+#             return ["UnknownPacket"]
+#
+#     return msg_type
 
-    return wrap
+
+def fill_answer_with(prefix: List[Letter], symbol: str, length: int) -> List[Letter]:
+    letters = prefix
+    while len(letters) < length:
+        letters.append(Letter(symbol))
+    return letters
+
+def get_expected_output(
+    input_word: Word, knowledge_tree: KnowledgeTree
+) -> List[Letter]:
+    prefix = input_word.letters[:-1]
+    while prefix:
+        try:
+            prefix_word = Word(letters=prefix)
+            output_prefix = knowledge_tree.get_output_word(prefix_word).letters
+            expected_output_word = [letter.name.strip("'") for letter in output_prefix]
+            if expected_output_word[-1] == "EOF":
+                return fill_answer_with(output_prefix, "EOF", len(input_word.letters))
+            return expected_output_word
+        # pylint: disable=broad-except
+        except Exception:
+            prefix.pop()
+    return []
 
 
-def dns_name_or_ip_address(name):
-    try:
-        ip = ipaddress.ip_address(name)
-    except ValueError:
-        return x509.DNSName(name)
-    else:
-        return x509.IPAddress(ip)
-
-
-def generate_certificate(*, alternative_names, common_name, hash_algorithm, key):
-    subject = issuer = x509.Name(
-        [x509.NameAttribute(x509.NameOID.COMMON_NAME, common_name)]
-    )
-
-    builder = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
-        .not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10)
-        )
-    )
-    if alternative_names:
-        builder = builder.add_extension(
-            x509.SubjectAlternativeName(
-                [dns_name_or_ip_address(name) for name in alternative_names]
-            ),
-            critical=False,
-        )
-    cert = builder.sign(key, hash_algorithm)
-    return cert, key
-
-
-def generate_ec_certificate(common_name, alternative_names=[], curve=ec.SECP256R1):
-    key = ec.generate_private_key(curve=curve())
-    return generate_certificate(
-        alternative_names=alternative_names,
-        common_name=common_name,
-        hash_algorithm=hashes.SHA256(),
-        key=key,
-    )
-
-
-def generate_ed25519_certificate(common_name, alternative_names=[]):
-    key = ed25519.Ed25519PrivateKey.generate()
-    return generate_certificate(
-        alternative_names=alternative_names,
-        common_name=common_name,
-        hash_algorithm=None,
-        key=key,
-    )
-
-
-def generate_ed448_certificate(common_name, alternative_names=[]):
-    key = ed448.Ed448PrivateKey.generate()
-    return generate_certificate(
-        alternative_names=alternative_names,
-        common_name=common_name,
-        hash_algorithm=None,
-        key=key,
-    )
-
-
-def generate_rsa_certificate(common_name, alternative_names=[]):
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    return generate_certificate(
-        alternative_names=alternative_names,
-        common_name=common_name,
-        hash_algorithm=hashes.SHA256(),
-        key=key,
-    )
-
-
-def load(name: str) -> bytes:
-    path = os.path.join(os.path.dirname(__file__), name)
-    with open(path, "rb") as fp:
-        return fp.read()
-
-
-SERVER_CACERTFILE = os.path.join(os.path.dirname(__file__), "pycacert.pem")
-SERVER_CERTFILE = os.path.join(os.path.dirname(__file__), "ssl_cert.pem")
-SERVER_CERTFILE_WITH_CHAIN = os.path.join(
-    os.path.dirname(__file__), "ssl_cert_with_chain.pem"
-)
-SERVER_KEYFILE = os.path.join(os.path.dirname(__file__), "ssl_key.pem")
-SERVER_COMBINEDFILE = os.path.join(os.path.dirname(__file__), "ssl_combined.pem")
-SKIP_TESTS = frozenset(os.environ.get("AIOQUIC_SKIP_TESTS", "").split(","))
-
-if os.environ.get("AIOQUIC_DEBUG"):
-    logging.basicConfig(level=logging.DEBUG)
+# def read_next_msg(tls_session, timeout=None):
+#     try:
+#         if timeout:
+#             tls_session.get_next_msg(socket_timeout=timeout)
+#         else:
+#             tls_session.get_next_msg()
+#     except socket.timeout:
+#         return []
+#     except ConnectionResetError:
+#         return None
+#     except BrokenPipeError:
+#         return None
+#     if not tls_session.buffer_in:
+#         return None
+#     result = abstract_response(tls_session.buffer_in)
+#     tls_session.buffer_in = []
+#     return result

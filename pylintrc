@@ -1,0 +1,6 @@
+[MESSAGE CONTROL]
+disable = missing-docstring
+
+[SIMILARITIES]
+ignore-comments = no
+ignore-docstrings = no

@@ -4,10 +4,9 @@ import os
 import os.path
 import sys
 import time
+import socket
 import logging
 
-from aioquic.quic.configuration import QuicConfiguration
-from aioquic.quic.packet import QuicProtocolVersion
 from pylstar.LSTAR import LSTAR
 from pylstar.ActiveKnowledgeBase import ActiveKnowledgeBase
 from pylstar.Letter import Letter
@@ -15,7 +14,6 @@ from pylstar.Word import Word
 
 import config.scenarios
 import tls_args
-from receive_data import Handle
 from utils import (
     fill_answer_with,
     get_expected_output,
@@ -23,127 +21,95 @@ from utils import (
 )
 from HappyPathFirst import HappyPathFirst
 from StoreHypotheses import StoreHypotheses
-from stubs.client_concretization import InfererTools
+from stubs.server_concretization import InfererTools
 from automata.automata import convert_from_pylstar
 
-from stubs.client_concretization import QUICClientInferTool
 
-
-class QUICServerKnowledgeBase(ActiveKnowledgeBase):
-    def __init__(self, dst_addr, local_addr, handle, options):
-        super().__init__()
-        self.tool = QUICClientInferTool(dst_addr, local_addr, handle)
-        self.options = options
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def stop_target(self):
-        pass
-
-    def start_target(self):
-        pass
-
-    def submit_word(self, word):
-        n = len(word.letters)
-
-        expected_letters = get_expected_output(word, self.knowledge_tree)
-        if len(expected_letters) == n:
-            return Word(letters=expected_letters)
-
-        output_letters = []
-        for i in range(n):
-            if self.options.verbose:
-                msg_to_send = "+".join(list(word.letters[i].symbols))
-                self.options.log(msg_to_send)
-
-            expected_letter = None
-            if expected_letters:
-                expected_letter = expected_letters.pop(0)
-
-            output_letter = self.send_and_receive(
-                expected_letter, word.letters[i].symbols
-            )
-
-            if self.options.verbose:
-                self.options.log(f" => {output_letter}\n")
-
-            output_letters.append(Letter(output_letter))
-            if output_letter == "EOF":
-                output_letters = fill_answer_with(output_letters, "EOF", n)
-                break
-
-        if self.options.verbose:
-            self.options.log("\n")
-        return Word(letters=output_letters)
-
-    def send_and_receive(self, expected_output, symbols):
-        try:
-            self.tool.concretize_client_messages(symbols)
-        except BrokenPipeError:
-            return "EOF"
-        except ConnectionResetError:
-            return "EOF"
-        # pylint: disable=broad-except
-        except Exception:
-            return "INTERNAL ERROR DURING EMISSION"
-
-        last_events = self.tool.logger.last_events()
-
-        try:
-            event = last_events.popleft()
-            data = event["data"]
-            response = [f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"]
-        except IndexError:
-            return ""
-
-        for event in last_events:
-            if expected_output is not None:
-                break
-            if "+".join(response) == expected_output:
-                return expected_output
-            data = event["data"]
-            response.append(
-                f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}")
-
-        return "+".join(response)
-
-
-class TLSServerKnowledgeBase(ActiveKnowledgeBase):
+class TLSClientKnowledgeBase(ActiveKnowledgeBase):
     def __init__(self, tls_version, options):
         super().__init__()
+
+        # TODO: Should be checked earlier
+        if options.crypto_material.default_material() == (None, None):
+            raise Exception("Missing crypto material")
+
+        if options.trigger_endpoint:
+            accept_timeout = options.timeout
+        else:
+            accept_timeout = None
+
         self.tools = InfererTools(
-            options.remote_endpoint,
+            options.local_endpoint,
             options.crypto_material,
-            tls_version,
+            options.timeout,
+            accept_timeout,
         )
+        self.tls_version = tls_version
+        self.broken_client = False
+        self.client_trigger = None
         self.tls_session = None
         self.options = options
 
     def start(self):
-        pass
+        if self.options.trigger_endpoint:
+            endpoint_tuple = self.options.trigger_endpoint.as_tuple()
+            self.client_trigger = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_trigger.connect(endpoint_tuple)
+
+        # Start TLS server
+        self.tls_session = self.tools.initTLS13Connexion()
 
     def stop(self):
-        pass
+        if self.client_trigger:
+            self.client_trigger.close()
 
     def start_target(self):
         pass
 
     def stop_target(self):
-        if self.tls_session:
-            self.tls_session.stop()
+        if self.tls_session.socket:
+            self.tls_session.socket.close()
+
+    def trigger_client(self):
+        host, port = self.options.local_endpoint.as_tuple()
+        trigger_string = f"{host} {port}\n".encode("utf8")
+        if self.client_trigger:
+            self.client_trigger.send_and_receive(trigger_string)
+            try:
+                _ = self.client_trigger.recv(8192, socket.MSG_DONTWAIT)
+            except BlockingIOError:
+                pass
+
+    def accept_connection(self):
+        try:
+            self.tls_session.WAITING_CLIENT()
+        except socket.timeout:
+            return False
+
+        self.tls_session.INIT_TLS_SESSION()
+        if self.tls_version == "tls13":
+            self.tls_session.tls13_handle_ClientHello()
+        else:
+            self.tls_session.tls12_handle_ClientHello()
+
+        return True
 
     def submit_word(self, word):
         n = len(word.letters)
+
+        if self.broken_client:
+            letters = fill_answer_with([], "NO_CONNECTION", n)
+            return Word(letters=letters)
 
         expected_letters = get_expected_output(word, self.knowledge_tree)
         if len(expected_letters) == n:
             return Word(letters=expected_letters)
 
-        self.tls_session = self.tools.get_tls_session()
+        self.trigger_client()
+        if not self.accept_connection():
+            self.broken_client = True
+            letters = fill_answer_with([], "NO_CONNECTION", n)
+            return Word(letters=letters)
 
         output_letters = []
         for i in range(n):
@@ -173,12 +139,8 @@ class TLSServerKnowledgeBase(ActiveKnowledgeBase):
 
     def send_and_receive(self, expected_output, symbols):
         try:
-            self.tools.concretize_client_messages(self.tls_session, symbols)
-            if symbols == {"TLSHardCodedFinished"}:
-                raw_client_finished = b"\x16\x03\x01\x00\x40" + (b"\xff" * 64)
-                self.tls_session.socket.send_and_receive(raw_client_finished)
-            else:
-                self.tls_session.flush_records()
+            self.tools.concretize_server_messages(self.tls_session, symbols)
+            self.tls_session.flush_records(symbols)
         except BrokenPipeError:
             return "EOF"
         except ConnectionResetError:
@@ -188,26 +150,19 @@ class TLSServerKnowledgeBase(ActiveKnowledgeBase):
             return "INTERNAL ERROR DURING EMISSION"
 
         # Possible shortcut
-        if expected_output == "No RSP":
-            if self.options.expected_minimal_timeout > 0:
-                real_timeout = min(
-                    self.options.expected_minimal_timeout, self.options.timeout
-                )
-            else:
-                return "No RSP"
-        else:
-            real_timeout = self.options.timeout
+        if expected_output is not None and expected_output == "No RSP":
+            return "No RSP"
 
         # Read the answer
         try:
-            response = read_next_msg(self.tls_session, timeout=real_timeout)
+            response = read_next_msg(self.tls_session)
             if response is None:
                 return "EOF"
             if not response:
                 return "No RSP"
 
             while expected_output is None or expected_output != "+".join(response):
-                next_msg = read_next_msg(self.tls_session, timeout=self.options.timeout)
+                next_msg = read_next_msg(self.tls_session)
                 if not next_msg:  # Covers next_msg is None and next_msg = []
                     break
                 response += next_msg
@@ -224,38 +179,29 @@ def log_fn(log_file, s):
 
 
 def main():
-    args = tls_args.parse_args(client_inference=False)
+    args = tls_args.parse_args(client_inference=True)
 
     try:
         os.mkdir(args.output_dir)
     except FileExistsError:
         pass
-    log_filename = f"{args.output_dir}/infer_server.log"
+    log_filename = f"{args.output_dir}/infer_client.log"
     log_file = open(log_filename, "w", encoding="utf-8")
     log = lambda s: log_fn(log_file, s)
     args.log = log
 
     dirname = os.path.dirname(sys.argv[0])
     with open(
-            f"{dirname}/../scenarios/{args.vocabulary}-client.scenario",
-            "r",
-            encoding="utf-8",
+        f"{dirname}/../scenarios/{args.vocabulary}-server.scenario",
+        "r",
+        encoding="utf-8",
     ) as scenario_file:
         crypto_material_names = [name for name in args.crypto_material.iter_names()]
         scenario = config.scenarios.load_scenario(scenario_file, crypto_material_names)
-    if scenario.role != "client":
+    if scenario.role != "server":
         raise Exception("Invalid scenario (expecting a client role)")
 
-    TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
-
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "..", "..", "vertify", "pycacert.pem")
-    configuration = QuicConfiguration()
-    configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
-    configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
-    quic_logger = QuicFileLogger(os.getcwd())
-    configuration.quic_logger = quic_logger
-    handle = Handle(configuration=configuration)
-    QUICBase = QUICServerKnowledgeBase(("127.0.0.1", 10086), ("127.0.0.1", 10011), handle, options=args)
+    TLSBase = TLSClientKnowledgeBase(scenario.tls_version, options=args)
 
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
     logging.getLogger("RandomWalkMethod").setLevel(logging.DEBUG)
@@ -268,8 +214,7 @@ def main():
 
         if args.messages:
             input_sequence = Word(letters=[Letter(m) for m in args.messages])
-            output_sequence = QUICBase._resolve_word(input_sequence)
-            # output_sequence = TLSBase._resolve_word(input_sequence)
+            output_sequence = TLSBase._resolve_word(input_sequence)
             output = [list(l.symbols)[0] for l in output_sequence.letters]
             last_output = output
             repetitions = 1
@@ -279,8 +224,7 @@ def main():
             sys.stdout.flush()
 
             for _i in range(1, args.loops):
-                # output_sequence = TLSBase._execute_word(input_sequence)
-                output_sequence = QUICBase._execute_word(input_sequence)
+                output_sequence = TLSBase._execute_word(input_sequence)
                 output = [list(l.symbols)[0] for l in output_sequence.letters]
 
                 if output == last_output:
@@ -305,8 +249,7 @@ def main():
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
 
-        eqtests = args.eq_method((QUICBase, input_letters))
-        # eqtests = args.eq_method((TLSBase, input_letters))
+        eqtests = args.eq_method((TLSBase, input_letters))
         if not args.disable_happy_path_first and scenario.interesting_paths:
             interesting_paths_with_letters = [
                 [Letter(s) for s in path] for path in scenario.interesting_paths

@@ -56,6 +56,9 @@ class QuicLoggerTrace:
 
     # QUIC
 
+    def last_events(self):
+        return [event for event in self._events if event["event"] == "packet_received"]
+
     def encode_ack_frame(self, ranges: RangeSet, delay: float) -> Dict:
         return {
             "ack_delay": self.encode_time(delay),
@@ -262,6 +265,7 @@ class QuicLoggerTrace:
             {
                 "data": data,
                 "name": category + ":" + event,
+                "event": event,
                 "time": self.encode_time(time.time()),
             }
         )
@@ -291,6 +295,9 @@ class QuicLogger:
         trace = QuicLoggerTrace()
         self._traces.append(trace)
         return trace
+
+    def last_events(self):
+        return self._traces[-1].last_events()
 
     def end_trace(self, trace: QuicLoggerTrace) -> None:
         assert trace in self._traces, "QuicLoggerTrace does not belong to QuicLogger"

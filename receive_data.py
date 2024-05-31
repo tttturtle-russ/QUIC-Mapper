@@ -27,8 +27,10 @@ from aioquic.buffer import (
     size_uint_var,
 )
 from aioquic.quic import events
-from aioquic.quic.configuration import (SMALLEST_MAX_DATAGRAM_SIZE, QuicConfiguration)
-from aioquic.quic.congestion.base import K_GRANULARITY
+SMALLEST_MAX_DATAGRAM_SIZE = 1200
+K_GRANULARITY = 1 / 1000
+from aioquic.quic.configuration import QuicConfiguration
+# from aioquic.quic.congestion.base import K_GRANULARITY
 from aioquic.quic.crypto import CryptoError, CryptoPair, KeyUnavailableError
 # from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet import (
@@ -66,8 +68,6 @@ from aioquic.quic.recovery import QuicPacketRecovery, QuicPacketSpace
 from aioquic.quic.stream import FinalSizeError, QuicStream, StreamFinishedError
 
 from logger import *
-
-from utils import *
 
 NetworkAddress = Any
 CRYPTO_BUFFER_SIZE = 16384
@@ -243,10 +243,10 @@ class Handle:
             session_ticket_handler: Optional[tls.SessionTicketHandler] = None,
             token_handler: Optional[QuicTokenHandler] = None,
     ) -> None:
-        assert configuration.max_datagram_size >= SMALLEST_MAX_DATAGRAM_SIZE, (
-            "The smallest allowed maximum datagram size is "
-            f"{SMALLEST_MAX_DATAGRAM_SIZE} bytes"
-        )
+        # assert configuration.max_datagram_size >= SMALLEST_MAX_DATAGRAM_SIZE, (
+        #     "The smallest allowed maximum datagram size is "
+        #     f"{SMALLEST_MAX_DATAGRAM_SIZE} bytes"
+        # )
         if configuration.is_client:
             assert (
                     original_destination_connection_id is None
@@ -303,7 +303,8 @@ class Handle:
         self._local_next_stream_id_bidi = 0 if self._is_client else 1
         self._local_next_stream_id_uni = 2 if self._is_client else 3
         self._loss_at: Optional[float] = None
-        self._max_datagram_size = configuration.max_datagram_size
+        # self._max_datagram_size = configuration.max_datagram_size
+        self._max_datagram_size = 1200
         self._network_paths: List[QuicNetworkPath] = []
         self._pacing_at: Optional[float] = None
         self._packet_number = 0
@@ -314,7 +315,8 @@ class Handle:
         self._peer_cid_available: List[QuicConnectionId] = []
         self._peer_cid_sequence_numbers: Set[int] = set([0])
         self._peer_retire_prior_to = 0
-        self._peer_token = configuration.token
+        self._peer_token = b""
+        # self._peer_token = configuration.token
         self._quic_logger = configuration.quic_logger.start_trace()
         self._remote_ack_delay_exponent = 3
         # self._remote_active_connection_id_limit = 2
@@ -444,7 +446,7 @@ class Handle:
         builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=self._is_client,
-            max_datagram_size=self._max_datagram_size,
+            # max_datagram_size=self._max_datagram_size,
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=self._peer_token,
@@ -2346,7 +2348,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            max_datagram_size=self._max_datagram_size,
+            # max_datagram_size=self._max_datagram_size,
         )
 
         crypto = self._cryptos[tls.Epoch.ONE_RTT]
@@ -2468,7 +2470,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            max_datagram_size=self._max_datagram_size,
+            # max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.HANDSHAKE]
         builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
@@ -2485,7 +2487,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            max_datagram_size=self._max_datagram_size,
+            # max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
@@ -2502,7 +2504,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            max_datagram_size=self._max_datagram_size,
+            # max_datagram_size=self._max_datagram_size,
         )
 
         space = self._spaces[tls.Epoch.ONE_RTT]
