@@ -2,6 +2,7 @@ import asyncio
 from protocol import QUICClientProtocol
 
 
+
 class QUICClientInferTool:
     def __init__(self, configuration, dst_addr, local_addr, handle):
         self.handle = handle
@@ -9,16 +10,15 @@ class QUICClientInferTool:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.transport = None
-        self.protocol = None
-        self.loop.run_until_complete(self.async_init(dst_addr, local_addr, handle))
+        self.protocol = QUICClientProtocol(dst_addr, local_addr, handle)
         self.local_endpoint = local_addr
 
-    async def async_init(self, dst_addr, local_addr, handle):
-        loop = asyncio.get_running_loop()
-        self.transport, self.protocol = await loop.create_datagram_endpoint(
-            lambda: QUICClientProtocol(dst_addr, handle),
-            local_addr=local_addr
-        )
+
+    # async def async_init(self, dst_addr, handle):
+    #     loop = asyncio.get_running_loop()
+    #     self.transport, self.protocol = await loop.create_datagram_endpoint(
+    #         lambda: QUICClientProtocol(dst_addr, handle)
+    #     )
 
     def concretize_client_messages(self, symbols):
         func_map = {

@@ -90,7 +90,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         except Exception as e:
             print(e)
             return "INTERNAL ERROR DURING EMISSION"
-
+        self.tool.protocol.datagram_received()
         last_events = self.tool.logger.last_events()
 
         try:
@@ -248,14 +248,14 @@ def main():
 
     # TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
 
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "..", "..", "vertify", "pycacert.pem")
+    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
     quic_logger = QuicFileLogger(os.getcwd())
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
-    QUICBase = QUICServerKnowledgeBase(configuration, ("127.0.0.1", 10086), ("127.0.0.1", 10011), handle, options=args)
+    QUICBase = QUICServerKnowledgeBase(configuration, ("172.17.0.2", 4433), ("172.17.0.1", 10011), handle, options=args)
 
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
     logging.getLogger("RandomWalkMethod").setLevel(logging.DEBUG)

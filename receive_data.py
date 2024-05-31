@@ -446,7 +446,7 @@ class Handle:
         builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=self._is_client,
-            # max_datagram_size=self._max_datagram_size,
+            max_datagram_size=self._max_datagram_size,
             packet_number=self._packet_number,
             peer_cid=self._peer_cid.cid,
             peer_token=self._peer_token,
@@ -2348,7 +2348,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            # max_datagram_size=self._max_datagram_size,
+            max_datagram_size=self._max_datagram_size,
         )
 
         crypto = self._cryptos[tls.Epoch.ONE_RTT]
@@ -2470,7 +2470,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            # max_datagram_size=self._max_datagram_size,
+            max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.HANDSHAKE]
         builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
@@ -2487,7 +2487,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            # max_datagram_size=self._max_datagram_size,
+            max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
@@ -2504,7 +2504,7 @@ class Handle:
             peer_cid=self._peer_cid.cid,
             peer_token=b'',
             version=self._version,
-            # max_datagram_size=self._max_datagram_size,
+            max_datagram_size=self._max_datagram_size,
         )
 
         space = self._spaces[tls.Epoch.ONE_RTT]

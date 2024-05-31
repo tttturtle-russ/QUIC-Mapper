@@ -1,4 +1,4 @@
-import asyncio
+# import asyncio
 import socket
 
 from aioquic.quic.packet import *
@@ -9,20 +9,21 @@ class QUICClientProtocol:
     def __init__(self, dst_addr, local_addr, handle):
         self.transport = None
         self.handle = handle
-        self._handshake_confirm = False
-        self.handshake_done = asyncio.Event()
+        # self._handshake_confirm = False
+        # self.handshake_done = asyncio.Event()
         self.dst_addr = dst_addr
         self.local_addr = local_addr
-        self._packet_receive_event = asyncio.Event()
+        # self._packet_receive_event = asyncio.Event()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(local_addr)
+        # self.sock.bind(local_addr)
+        # self.sock.setblocking(False)
         # self.handle.connect()
 
     def initial_ack_packet(self):
         addr = self.dst_addr
         for datagram in self.handle.send_initial_ack_packet():
             self.transmit(datagram, addr)
-            self.wait_for_packet()
+            # self.wait_for_packet()
 
     def handshake_packet(self):
         addr = self.dst_addr
@@ -38,8 +39,6 @@ class QUICClientProtocol:
         addr = self.dst_addr
         for datagram in self.handle.connect(addr):
             self.transmit(datagram, addr)
-
-
     def transmit(self, data, addr):
         self.sock.sendto(data, addr)
 
