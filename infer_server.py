@@ -374,17 +374,11 @@ def main():
     with open(f"{args.output_dir}/final.automaton", "w", encoding="utf-8") as fd:
         fd.write(f"{automaton}\n")
 
-<<<<<<< Updated upstream
-    log(f"n_queries={TLSBase.stats.nb_query}\n")
-    log(f"n_submitted_queries={TLSBase.stats.·nb_submited_query}\n")
-    log(f"n_letters={TLSBase.stats.nb_letter}\n")
-    log(f"n_submitted_letters={TLSBase.stats.nb_submited_letter}\n")
-=======
     log(f"n_queries={QUICBase.stats.nb_query}\n")
     log(f"n_submitted_queries={QUICBase.stats.nb_submited_query}\n")
     log(f"n_letters={QUICBase.stats.nb_letter}\n")
     log(f"n_submitted_letters={QUICBase.stats.nb_submited_letter}\n")
->>>>>>> Stashed changes
+
 
 
 if __name__ == "__main__":
