@@ -35,24 +35,24 @@ from BDistMethod import BDistMethod
 #     return crypto_material
 #
 #
-# def handle_eq_method(parser, eq_method_str):
-#     elts = eq_method_str.split(":")
-#     if len(elts) == 2 and elts[0] == "WP":
-#         max_states = int(elts[1])
-#         eq_method = lambda x: WpMethodEQ(x[0], max_states, x[1])
-#         return eq_method, f"WPMethod({max_states})"
-#     if len(elts) == 3 and elts[0] == "RW":
-#         nb_steps = int(elts[1])
-#         reset_proba = float(elts[2])
-#         eq_method = lambda x: RandomWalkMethod(x[0], x[1], nb_steps, reset_proba)
-#         return eq_method, f"RandomWalk({nb_steps}, {reset_proba})"
-#     if len(elts) == 2 and elts[0] == "BDist":
-#         distinguishing_bound = int(elts[1])
-#         eq_method = lambda x: BDistMethod(x[0], x[1], distinguishing_bound)
-#         return eq_method, f"BDist({distinguishing_bound})"
-#     print(f"Invalid Equivalence Method ({eq_method_str})", file=sys.stderr)
-#     parser.print_usage(file=sys.stderr)
-#     sys.exit(1)
+def handle_eq_method(parser, eq_method_str):
+    elts = eq_method_str.split(":")
+    if len(elts) == 2 and elts[0] == "WP":
+        max_states = int(elts[1])
+        eq_method = lambda x: WpMethodEQ(x[0], max_states, x[1])
+        return eq_method, f"WPMethod({max_states})"
+    if len(elts) == 3 and elts[0] == "RW":
+        nb_steps = int(elts[1])
+        reset_proba = float(elts[2])
+        eq_method = lambda x: RandomWalkMethod(x[0], x[1], nb_steps, reset_proba)
+        return eq_method, f"RandomWalk({nb_steps}, {reset_proba})"
+    if len(elts) == 2 and elts[0] == "BDist":
+        distinguishing_bound = int(elts[1])
+        eq_method = lambda x: BDistMethod(x[0], x[1], distinguishing_bound)
+        return eq_method, f"BDist({distinguishing_bound})"
+    print(f"Invalid Equivalence Method ({eq_method_str})", file=sys.stderr)
+    parser.print_usage(file=sys.stderr)
+    sys.exit(1)
 
 
 def parse_args(client_inference):
@@ -200,9 +200,9 @@ def parse_args(client_inference):
     # result.crypto_material = handle_crypto_material(parser, args.crypto_material_list)
     #
     # result.disable_happy_path_first = args.disable_happy_path_first
-    # result.eq_method, result.eq_method_str = handle_eq_method(
-    #     parser, args.eq_method_str
-    # )
+    result.eq_method, result.eq_method_str = handle_eq_method(
+        parser, args.eq_method_str
+    )
 
     # TODO!
     # Scenario = vocabulary + TLS version + Ciphersuites + Cert required?

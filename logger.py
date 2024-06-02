@@ -49,6 +49,7 @@ class QuicLoggerTrace:
     def __init__(self) -> None:
         # self._odcid = odcid
         self._events: Deque[Dict[str, Any]] = deque()
+        self.index = 0
         # self._vantage_point = {
         #     "name": "aioquic",
         #     "type": "client" if is_client else "server",
@@ -57,7 +58,13 @@ class QuicLoggerTrace:
     # QUIC
 
     def last_events(self):
-        return [event for event in self._events if event["event"] == "packet_received"]
+        result = []
+        # Since we cannot slice deques efficiently, we iterate manually
+        for i, event in enumerate(self._events):
+            if i >= self.index and event["event"] == "packet_received":
+                result.append(event)
+        self.index = len(self._events)
+        return result
 
     def encode_ack_frame(self, ranges: RangeSet, delay: float) -> Dict:
         return {
@@ -290,6 +297,7 @@ class QuicLogger:
 
     def __init__(self) -> None:
         self._traces: List[QuicLoggerTrace] = []
+        self.index = 0
 
     def start_trace(self) -> QuicLoggerTrace:
         trace = QuicLoggerTrace()

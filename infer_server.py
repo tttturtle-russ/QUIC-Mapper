@@ -38,7 +38,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         pass
 
     def stop(self):
-        pass
+        self.tool.handle.end_trace_file()
 
     def stop_target(self):
         pass
@@ -107,8 +107,10 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                 return expected_output
             data = event["data"]
             response.append(
-                f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}")
+                f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
+            )
 
+        print("+".join(response))
         return "+".join(response)
 
 
@@ -248,7 +250,7 @@ def main():
 
     # TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
 
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
+    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "dummy.ca.crt")
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
@@ -262,6 +264,7 @@ def main():
     logging.getLogger("BDistMethod").setLevel(logging.DEBUG)
     logging.getLogger("HappyPathFirst").setLevel(logging.DEBUG)
     logging.getLogger("StoreHypotheses").setLevel(logging.DEBUG)
+
 
     try:
         # TLSBase.start()
@@ -372,7 +375,7 @@ def main():
         fd.write(f"{automaton}\n")
 
     log(f"n_queries={TLSBase.stats.nb_query}\n")
-    log(f"n_submitted_queries={TLSBase.stats.nb_submited_query}\n")
+    log(f"n_submitted_queries={TLSBase.stats.·nb_submited_query}\n")
     log(f"n_letters={TLSBase.stats.nb_letter}\n")
     log(f"n_submitted_letters={TLSBase.stats.nb_submited_letter}\n")
 

@@ -23,6 +23,7 @@ class QUICClientInferTool:
     def concretize_client_messages(self, symbols):
         func_map = {
             "ConnectInitial": self.protocol.connect,
+            # "InitialAck":self.protocol.initial_ack_packet(),
             "HandshakeInitial": self.protocol.initial_ack_packet,
             "Handshake": self.protocol.handshake_packet,
             "PathChallenge": self.protocol.path_challenge,
