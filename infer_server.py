@@ -238,13 +238,13 @@ def main():
     args.log = log
 
     dirname = os.path.dirname(sys.argv[0])
-    # with open(
-    #         f"{dirname}/../scenarios/{args.vocabulary}-client.scenario",
-    #         "r",
-    #         encoding="utf-8",
-    # ) as scenario_file:
+    with open(
+            f"{dirname}/../scenarios/{args.vocabulary}-client.scenario",
+            "r",
+            encoding="utf-8",
+    ) as scenario_file:
     #     crypto_material_names = [name for name in args.crypto_material.iter_names()]
-    #     scenario = config.scenarios.load_scenario(scenario_file, crypto_material_names)
+        scenario = config.scenarios.load_scenario(scenario_file)
     # if scenario.role != "client":
     #     raise Exception("Invalid scenario (expecting a client role)")
 
@@ -349,16 +349,16 @@ def main():
             interesting_paths_with_letters = [
                 [Letter(s) for s in path] for path in scenario.interesting_paths
             ]
-            eqtests = HappyPathFirst(TLSBase, interesting_paths_with_letters, eqtests)
+            eqtests = HappyPathFirst(QUICBase, interesting_paths_with_letters, eqtests)
         eqtests = StoreHypotheses(
-            TLSBase,
+            QUICBase,
             scenario.input_vocabulary,
             args.output_dir,
             eqtests,
         )
 
         lstar = LSTAR(
-            scenario.input_vocabulary, TLSBase, max_states=15, eqtests=eqtests
+            scenario.input_vocabulary, QUICBase, max_states=15, eqtests=eqtests
         )
         start = time.time()
         state_machine = lstar.learn()
@@ -374,10 +374,17 @@ def main():
     with open(f"{args.output_dir}/final.automaton", "w", encoding="utf-8") as fd:
         fd.write(f"{automaton}\n")
 
+<<<<<<< Updated upstream
     log(f"n_queries={TLSBase.stats.nb_query}\n")
     log(f"n_submitted_queries={TLSBase.stats.·nb_submited_query}\n")
     log(f"n_letters={TLSBase.stats.nb_letter}\n")
     log(f"n_submitted_letters={TLSBase.stats.nb_submited_letter}\n")
+=======
+    log(f"n_queries={QUICBase.stats.nb_query}\n")
+    log(f"n_submitted_queries={QUICBase.stats.nb_submited_query}\n")
+    log(f"n_letters={QUICBase.stats.nb_letter}\n")
+    log(f"n_submitted_letters={QUICBase.stats.nb_submited_letter}\n")
+>>>>>>> Stashed changes
 
 
 if __name__ == "__main__":

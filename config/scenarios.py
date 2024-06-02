@@ -23,17 +23,60 @@ class ScenarioError(BaseException):
     pass
 
 
+class QUICScenario:
+    def __init__(self,
+                 scenario_description: configparser.ConfigParser
+                 ):
+        if (
+                "general" not in scenario_description.sections()
+                or "name" not in scenario_description["general"]
+                or "role" not in scenario_description["general"]
+        ):
+            raise ScenarioError(
+                "Missing name or role in the general section"
+            )
+        self.scenario_description = scenario_description
+        self.input_vocabulary: List[str] = []
+        self.register_input_vocabulary()
+
+    @property
+    def name(self) -> str:
+        return self.scenario_description["general"]["name"]
+
+    @property
+    def role(self) -> str:
+        return self.scenario_description["general"]["role"]
+
+    def register_input_vocabulary(self):
+        if "input_vocabulary" not in self.scenario_description["general"]:
+            raise ScenarioError("Missing input_vocabulary in the general section")
+
+        self.input_vocabulary = self.get_list("general", "input_vocabulary")
+
+    def get_list(self, section: str, parameter: str) -> List[str]:
+        try:
+            raw_msgs: str = self.scenario_description[section][parameter]
+            return [msg.strip() for msg in raw_msgs.split(",")]
+        except KeyError:
+            return []
+
+    def check_path_consistency(self, path: List[str]):
+        for msg in path:
+            if msg not in self.input_vocabulary:
+                raise ScenarioError(f'Unknown message "{msg}" in path "{path}"')
+
+
 class Scenario:
     def __init__(
-        self,
-        scenario_description: configparser.ConfigParser,
-        crypto_material_names: List[str],
+            self,
+            scenario_description: configparser.ConfigParser,
+            crypto_material_names: List[str],
     ):
         if (
-            "general" not in scenario_description.sections()
-            or "name" not in scenario_description["general"]
-            or "role" not in scenario_description["general"]
-            or "tls_version" not in scenario_description["general"]
+                "general" not in scenario_description.sections()
+                or "name" not in scenario_description["general"]
+                or "role" not in scenario_description["general"]
+                or "tls_version" not in scenario_description["general"]
         ):
             raise ScenarioError(
                 "Missing name, role or tls_version in the general section"
@@ -97,7 +140,7 @@ class Scenario:
             self.register_interesting_path(name.strip(), allowed_parameters)
 
     def register_interesting_path(
-        self, path_name: str, allowed_parameters: Dict[str, Tuple[str, List[str]]]
+            self, path_name: str, allowed_parameters: Dict[str, Tuple[str, List[str]]]
     ):
         msgs: List[str] = self.get_list(path_name, "path")
         if not msgs:
@@ -135,10 +178,10 @@ class Scenario:
         self.happy_paths.append(list(zip(sent_msgs, received_msgs)))
 
 
-def load_scenario(input_file: TextIO, crypto_material_names: List[str]):
+def load_scenario(input_file: TextIO):
     config = configparser.ConfigParser()
     try:
         config.read_file(input_file)
     except configparser.Error as parsing_err:
         raise ScenarioError("Invalid config file") from parsing_err
-    return Scenario(config, crypto_material_names)
+    return QUICScenario(config)

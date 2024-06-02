@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from pylstar.automata.Automata import Automata
 from pylstar.Word import Word
 from pylstar.OutputQuery import OutputQuery
@@ -29,7 +29,7 @@ class BDistMethod:
             "Starting the BDistMethod Algorithm to search for a counter-example"
         )
 
-        representatives: dict[str, Word] = self.get_representatives(hypothesis)
+        representatives: Dict[str, Word] = self.get_representatives(hypothesis)
 
         for q in hypothesis.get_states():
             for letter in self.input_letters:
