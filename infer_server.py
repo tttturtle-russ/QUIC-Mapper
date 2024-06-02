@@ -298,6 +298,41 @@ def main():
             if args.loops > 1:
                 print(f"    sequence observed {repetitions} times\n")
 
+            log(f"input_letters {args.messages}\n")
+            log(f"eqtests: {args.eq_method_str}\n")
+            log(f"timeout: {args.timeout}\n")
+
+            eqtests = args.eq_method((QUICBase, args.messages))
+            eqtests = StoreHypotheses(
+                QUICBase,
+                args.messages,
+                args.output_dir,
+                eqtests,
+            )
+
+            lstar = LSTAR(
+                args.messages, QUICBase, max_states=15, eqtests=eqtests
+            )
+
+            start = time.time()
+            state_machine = lstar.learn()
+            end = time.time()
+
+            duration = end - start
+            log(f"\ntime spent in lstar.learn(): {duration}\n")
+            log(f"n_states: {len(state_machine.get_states())}\n")
+
+            QUICBase.stop()
+
+            automaton = convert_from_pylstar(args.messages, state_machine)
+            with open(f"{args.output_dir}/final.automaton", "w", encoding="utf-8") as fd:
+                fd.write(f"{automaton}\n")
+
+            log(f"n_queries={QUICBase.stats.nb_query}\n")
+            log(f"n_submitted_queries={QUICBase.stats.nb_submited_query}\n")
+            log(f"n_letters={QUICBase.stats.nb_letter}\n")
+            log(f"n_submitted_letters={QUICBase.stats.nb_submited_letter}\n")
+
             return
 
         input_letters = [Letter(s) for s in scenario.input_vocabulary]
