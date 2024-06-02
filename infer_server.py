@@ -239,7 +239,7 @@ def main():
 
     dirname = os.path.dirname(sys.argv[0])
     with open(
-            f"{dirname}/../scenarios/{args.vocabulary}-client.scenario",
+            f"{dirname}/scenarios/test.scenario",
             "r",
             encoding="utf-8",
     ) as scenario_file:
