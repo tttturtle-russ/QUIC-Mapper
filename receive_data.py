@@ -2300,15 +2300,9 @@ class Handle:
             version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
-        if self._cryptos[tls.Epoch.HANDSHAKE] is not None:
-            crypto = self._cryptos[tls.Epoch.HANDSHAKE]
-        else:
-            crypto = self._cryptos[tls.Epoch.INITIAL]
+        crypto = self._cryptos[tls.Epoch.HANDSHAKE]
         # crypto_stream = self._crypto_streams[tls.Epoch.HANDSHAKE]
-        if self._spaces[tls.Epoch.HANDSHAKE] is not None:
-            space = self._spaces[tls.Epoch.HANDSHAKE]
-        else:
-            space = self._spaces[tls.Epoch.INITIAL]
+        space = self._spaces[tls.Epoch.HANDSHAKE]
         # packet_type = PACKET_TYPE_HANDSHAKE
         builder.start_packet(PACKET_TYPE_HANDSHAKE, crypto)
 
@@ -2362,15 +2356,9 @@ class Handle:
 
         # crypto = self._cryptos[tls.Epoch.ONE_RTT]
         # space = self._spaces[tls.Epoch.ONE_RTT]
-        if self._cryptos[tls.Epoch.ONE_RTT] is not None:
-            crypto = self._cryptos[tls.Epoch.ONE_RTT]
-        else:
-            crypto = self._cryptos[tls.Epoch.INITIAL]
 
-        if self._spaces[tls.Epoch.ONE_RTT] is not None:
-            space = self._spaces[tls.Epoch.ONE_RTT]
-        else:
-            space = self._spaces[tls.Epoch.INITIAL]
+        crypto = self._cryptos[tls.Epoch.ONE_RTT]
+        space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, crypto)
         self._write_ack_frame(builder, space)
         return builder
@@ -2431,6 +2419,8 @@ class Handle:
         return builder
 
     def send_path_challenge(self):
+        if not self._handshake_complete:
+            return self._get_datagrams("bin/path_challenge.bin")
         builder = self.send_1rtt_packet()
         # space = self._spaces[tls.Epoch.ONE_RTT]
         # self._write_ack_frame(builder, space)
@@ -2441,6 +2431,8 @@ class Handle:
         return datagrams
 
     def send_path_response(self):
+        if not self._handshake_complete:
+            return self._get_datagrams("bin/path_response.bin")
         builder = self.send_1rtt_packet()
         # self._write_ack_frame(builder, space)
 
@@ -2451,6 +2443,8 @@ class Handle:
         return datagrams
 
     def send_new_connectionid(self):
+        if not self._handshake_complete:
+            return self._get_datagrams("bin/new_connid.bin")
         builder = self.send_1rtt_packet()
         self._new_connectionid_frame(builder)
         datagrams, packets = builder.flush()
@@ -2497,10 +2491,7 @@ class Handle:
             version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
-        if self._spaces[tls.Epoch.HANDSHAKE] is None:
-            space = self._spaces[tls.Epoch.INITIAL]
-        else:
-            space = self._spaces[tls.Epoch.HANDSHAKE]
+        space = self._spaces[tls.Epoch.HANDSHAKE]
         builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
         self._write_ack_frame(builder, space)
         self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
@@ -2519,10 +2510,9 @@ class Handle:
             version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
-        if self._spaces[tls.Epoch.ONE_RTT] is not None:
-            space = self._spaces[tls.Epoch.ONE_RTT]
-        else:
-            space = self._spaces[tls.Epoch.INITIAL]
+        if not self._handshake_complete:
+            return self._get_datagrams("bin/onertt_close.bin")
+        space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
         self._write_ack_frame(builder, space)
         self._write_connection_close_frame(builder, tls.Epoch.ONE_RTT, 0, None, "")
@@ -2541,10 +2531,9 @@ class Handle:
             version=self._version,
             max_datagram_size=self._max_datagram_size,
         )
-        if self._spaces[tls.Epoch.ONE_RTT] is not None:
-            space = self._spaces[tls.Epoch.ONE_RTT]
-        else:
-            space = self._spaces[tls.Epoch.INITIAL]
+        if not self._handshake_complete:
+            return self._get_datagrams("bin/onertt_ack.bin")
+        space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
         self._write_ack_frame(builder, space)
         datagrams, packets = builder.flush()

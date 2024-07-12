@@ -50,6 +50,7 @@ def main():
     # protocol.initial_close()
     protocol.handshake_packet()
     protocol.datagram_received()
+
     # protocol.connect()
     # protocol.datagram_received()
     # protocol.onertt_ack()

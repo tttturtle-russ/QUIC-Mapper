@@ -1,4 +1,5 @@
 # import asyncio
+import select
 import socket
 
 from aioquic.quic.packet import *
@@ -33,6 +34,9 @@ class QUICClientProtocol:
             self.transmit(datagram, addr)
 
     def datagram_received(self):
+        readable, writeable, errored = select.select([self.sock], [], [],1)
+        if self.sock not in readable:
+            return
         data, addr = self.sock.recvfrom(2048)
         self.handle.receive_datagram(data, addr, now=0.0)
 

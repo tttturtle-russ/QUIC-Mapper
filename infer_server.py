@@ -109,19 +109,9 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             # else:
             print(e)
             return "INTERNAL ERROR DURING EMISSION"
-        start_time = time.time()
-        timeout_reached = False
 
-        while not timeout_reached:
-            current_time = time.time()
-            if current_time - start_time > 1:
-                timeout_reached = True
-                break
-            self.tool.protocol.datagram_received()
-        if not timeout_reached:
-            last_events = self.tool.logger.last_events()
-        else:
-            last_events = []
+        self.tool.protocol.datagram_received()
+        last_events = self.tool.logger.last_events()
 
         try:
             event = last_events.pop(0)
