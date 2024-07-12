@@ -1,5 +1,6 @@
 import time
 from pylstar.tools.Decorators import PylstarLogger
+from pylstar.Letter import Letter
 from pylstar.Word import Word
 from pylstar.OutputQuery import OutputQuery
 from automata.automata import convert_from_pylstar

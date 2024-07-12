@@ -1,4 +1,8 @@
 import asyncio
+
+import pylstar.LSTAR
+from pylstar.Letter import Letter
+
 from protocol import QUICClientProtocol
 
 
@@ -6,6 +10,7 @@ from protocol import QUICClientProtocol
 class QUICClientInferTool:
     def __init__(self, configuration, dst_addr, local_addr, handle):
         self.handle = handle
+        self.configuration = configuration
         self.logger = configuration.quic_logger
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -34,11 +39,21 @@ class QUICClientInferTool:
             "NewConnectionID": self.protocol.new_connection_id,
         }
         for symbol in symbols:
-            func = func_map.get(symbol, None)
-            if func is None:
-                raise ValueError(f"Unknown vocabulary :: {symbol}")
-            func()
+            if isinstance(symbol, Letter):
+                for symbol in symbol.symbols:
+                    func = func_map.get(symbol, None)
+                    if func is None:
+                        raise ValueError(f"Unknown vocabulary :: {symbol}")
+                    func()
+            elif isinstance(symbol, str):
+                print(symbol)
+                func = func_map.get(symbol, None)
+                if func is None:
+                    raise ValueError(f"Unknown vocabulary :: {symbol}")
+                func()
 
+    def reset(self):
+        self.protocol.reset()
 
 # class InfererTools:
 #     def __init__(self, remote_endpoint, crypto_material, tls_version):

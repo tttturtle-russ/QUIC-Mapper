@@ -41,6 +41,7 @@ def main():
     # above is necessary
     protocol = QUICClientProtocol(addr, local_addr, handle)
     # try:
+    protocol.reset()
     protocol.connect()
     protocol.datagram_received()
     # await asyncio.sleep(0.1)
@@ -49,13 +50,23 @@ def main():
     # protocol.initial_close()
     protocol.handshake_packet()
     protocol.datagram_received()
-    protocol.onertt_ack()
-
+    # protocol.connect()
+    # protocol.datagram_received()
+    # protocol.onertt_ack()
+    # protocol.initial_ack_packet()
+    # protocol.datagram_received()
     # await asyncio.sleep(0.1)
     # protocol.send_handshake_packet()
     # protocol.end_trace()
     # await protocol.handshake_done.wait()
     # protocol.path_challenge()
+    # handle.reset(configuration)
+    # print('reset\n')
+    # protocol.connect()
+    # protocol.datagram_received()
+    # protocol.onertt_close()
+    protocol.path_response()
+    protocol.datagram_received()
     # #
     # protocol.path_response()
     # #

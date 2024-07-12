@@ -1,7 +1,9 @@
+import logging
 from typing import List, Dict, Tuple, Set, Iterator, Optional
 from itertools import combinations, product
 import hashlib
 import pylstar.automata.Automata
+from pylstar.Letter import Letter
 
 
 class IncompleteInputVocabulary(BaseException):
@@ -46,11 +48,16 @@ class Automaton:
         self.hash: Optional[bytes] = None
 
     def __str__(self):
-        vocabulary = list(self.input_vocabulary)
+        # vocabulary = list(self.input_vocabulary)
+        vocabulary = []
+        for letter in self.input_vocabulary:
+            for symbol in letter.symbols:
+                vocabulary.append(symbol)
         vocabulary.sort()
         result = [" ".join(vocabulary)]
         for state in sorted(self.states):
-            for input_word in sorted(self.states[state]):
+            print(type(self.states[state]))
+            for input_word in (self.states[state]):
                 output_state, output_words, _ = self.states[state][input_word]
                 output_words_s = "+".join(output_words)
                 result.append(
@@ -82,8 +89,8 @@ class Automaton:
         output_words: List[str],
         colors: Set[str] = None,
     ):
-        if input_word not in self.input_vocabulary and input_word != "*":
-            raise IncompleteInputVocabulary(input_word, self.input_vocabulary)
+        # if (input_word not in self.input_vocabulary and Letter(input_word) not in self.input_vocabulary) and input_word != "*":
+        #     raise IncompleteInputVocabulary(input_word, self.input_vocabulary)
         self.hash = None
         self.add_state(input_state)
         self.add_state(output_state)
@@ -91,7 +98,8 @@ class Automaton:
             colors = set()
         if input_word != "*":
             if input_word in self.states[input_state]:
-                raise MultipleDefinitionForATransition(input_state, input_word)
+                return
+                # raise MultipleDefinitionForATransition(input_state, input_word)
             transition_content = (output_state, output_words, colors)
             self.states[input_state][input_word] = (output_state, output_words, colors)
         else:
@@ -101,7 +109,12 @@ class Automaton:
                     self.states[input_state][word] = transition_content
 
     def follow_transition(self, state: int, msg: str):
-        return self.states[state][msg]
+        if isinstance(msg, Letter):
+            for symbol in msg.symbols:
+                _msg = symbol
+        print(_msg)
+        logging.warn(_msg)
+        return self.states[state][_msg]
 
     def run(
         self, msg_sequence: List[str], initial_state=0
@@ -423,7 +436,10 @@ def convert_from_pylstar(
     for input_state in pylstar_automaton.get_states():
         for transition in input_state.transitions:
             input_word, output_words = transition.label.split("/")
-            input_word = input_word.strip()
+            input_word = input_word.strip().strip("'")
+            # if not isinstance(input_word, Letter):
+            #     input_word = Letter(input_word)
+            # print(input_word)
             output_words = [m.strip() for m in output_words.split("+") if m.strip()]
             automaton.add_transition(
                 int(input_state.name),

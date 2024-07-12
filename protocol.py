@@ -20,12 +20,14 @@ class QUICClientProtocol:
         # self.handle.connect()
 
     def initial_ack_packet(self):
+        print('initial ack\n')
         addr = self.dst_addr
         for datagram in self.handle.send_initial_ack_packet():
             self.transmit(datagram, addr)
             # self.wait_for_packet()
 
     def handshake_packet(self):
+        print('handshake packet\n')
         addr = self.dst_addr
         for datagram in self.handle.send_handshake_packet():
             self.transmit(datagram, addr)
@@ -36,6 +38,7 @@ class QUICClientProtocol:
 
 
     def connect(self):
+        print('connect\n')
         addr = self.dst_addr
         for datagram in self.handle.connect(addr):
             self.transmit(datagram, addr)
@@ -43,6 +46,7 @@ class QUICClientProtocol:
         self.sock.sendto(data, addr)
 
     def path_challenge(self):
+        print('path challenge\n')
         for data in self.handle.send_path_challenge():
             self.transmit(data, self.dst_addr)
 
@@ -72,6 +76,9 @@ class QUICClientProtocol:
 
     def end_trace(self):
         self.handle.end_trace_file()
+
+    def reset(self):
+        self.handle.reset(self.dst_addr)
 
 
 

@@ -43,6 +43,7 @@ class QUICClientInferTool:
             "NewConnectionID": self.protocol.new_connection_id,
         }
         for symbol in symbols:
+            print(symbol)
             func = func_map.get(symbol, None)
             if func is None:
                 raise ValueError(f"Unknown vocabulary :: {symbol}")

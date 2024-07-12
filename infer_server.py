@@ -31,8 +31,12 @@ from stubs.client_concretization import QUICClientInferTool
 class QUICServerKnowledgeBase(ActiveKnowledgeBase):
     def __init__(self, configuration, dst_addr, local_addr, handle, options):
         super().__init__()
+        self.configuration = configuration
+        self.dst_addr = dst_addr
+        self.local_addr = local_addr
         self.tool = QUICClientInferTool(configuration, dst_addr, local_addr, handle)
         self.options = options
+        self.learned = False
 
     def start(self):
         pass
@@ -44,9 +48,19 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         pass
 
     def start_target(self):
-        pass
+        self.reset()
+        # pass
+
+    # def reset(self):
+    #     handle = Handle(configuration=self.configuration)
+    #     self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
 
     def submit_word(self, word):
+
+        # if not self.learned:
+        # handle = Handle(configuration=self.configuration)
+        # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
+        # self.learned = True
         n = len(word.letters)
 
         expected_letters = get_expected_output(word, self.knowledge_tree)
@@ -77,6 +91,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
         if self.options.verbose:
             self.options.log("\n")
+        # self.reset()
         return Word(letters=output_letters)
 
     def send_and_receive(self, expected_output, symbols):
@@ -88,10 +103,25 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return "EOF"
         # pylint: disable=broad-except
         except Exception as e:
+            # if e == '<Epoch.INITIAL: 0>' or e == '<Epoch.HANDSHAKE: 2>' or e == '<Epoch.ONE_RTT: 3>':
+            # return "EOF"
+            # pass
+            # else:
             print(e)
             return "INTERNAL ERROR DURING EMISSION"
-        self.tool.protocol.datagram_received()
-        last_events = self.tool.logger.last_events()
+        start_time = time.time()
+        timeout_reached = False
+
+        while not timeout_reached:
+            current_time = time.time()
+            if current_time - start_time > 1:
+                timeout_reached = True
+                break
+            self.tool.protocol.datagram_received()
+        if not timeout_reached:
+            last_events = self.tool.logger.last_events()
+        else:
+            last_events = []
 
         try:
             event = last_events.pop(0)
@@ -112,6 +142,11 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
         print("+".join(response))
         return "+".join(response)
+
+    def reset(self):
+        # handle = Handle(configuration=self.configuration)
+        # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
+        self.tool.reset()
 
 
 # class TLSServerKnowledgeBase(ActiveKnowledgeBase):
@@ -237,13 +272,13 @@ def main():
     log = lambda s: log_fn(log_file, s)
     args.log = log
 
-    dirname = os.path.dirname(sys.argv[0])
+    # dirname = os.path.dirname(sys.argv[1])
     with open(
-            f"{dirname}/scenarios/test.scenario",
+            f"./scenarios/test.scenario",
             "r",
             encoding="utf-8",
     ) as scenario_file:
-    #     crypto_material_names = [name for name in args.crypto_material.iter_names()]
+        #     crypto_material_names = [name for name in args.crypto_material.iter_names()]
         scenario = config.scenarios.load_scenario(scenario_file)
     # if scenario.role != "client":
     #     raise Exception("Invalid scenario (expecting a client role)")
@@ -265,14 +300,16 @@ def main():
     logging.getLogger("HappyPathFirst").setLevel(logging.DEBUG)
     logging.getLogger("StoreHypotheses").setLevel(logging.DEBUG)
 
-
     try:
         # TLSBase.start()
         QUICBase.start()
+
         if args.messages:
             input_sequence = Word(letters=[Letter(m) for m in args.messages])
+
             output_sequence = QUICBase._resolve_word(input_sequence)
             # output_sequence = TLSBase._resolve_word(input_sequence)
+
             output = [list(l.symbols)[0] for l in output_sequence.letters]
             last_output = output
             repetitions = 1
@@ -338,32 +375,41 @@ def main():
 
             return
 
-        input_letters = [Letter(s) for s in scenario.input_vocabulary]
-        log(f"input_letters {scenario.input_vocabulary}\n")
+        # input_letters = [s for s in scenario.input_vocabulary[1:]]
+        input_letters = [Letter(s) for s in scenario.input_vocabulary[1:]]
+        log(f"input_letters {scenario.input_vocabulary[1:]}\n")
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
+        input_sequence = Word(letters=[Letter(s) for s in scenario.input_vocabulary])
+        # output_sequence = QUICBase._resolve_word(input_sequence)
+        # output_sequence = TLSBase._resolve_word(input_sequence)
+        # output = [list(l.symbols)[0] for l in output_sequence.letters]
+        # last_output = output
+        # repetitions = 1
+        print('-'*20)
+        # for sent, received in zip(input_letters, output):
+        #     log(f"{sent} => {received}\n")
+        # sys.stdout.flush()
 
         eqtests = args.eq_method((QUICBase, input_letters))
         # eqtests = args.eq_method((TLSBase, input_letters))
-        if not args.disable_happy_path_first and scenario.interesting_paths:
-            interesting_paths_with_letters = [
-                [Letter(s) for s in path] for path in scenario.interesting_paths
-            ]
-            eqtests = HappyPathFirst(QUICBase, interesting_paths_with_letters, eqtests)
+        # if scenario.interesting_paths:
+        #     interesting_paths_with_letters = [
+        #         [Letter(s) for s in path] for path in scenario.interesting_paths
+        #     ]
+        #     eqtests = HappyPathFirst(QUICBase, interesting_paths_with_letters, eqtests)
         eqtests = StoreHypotheses(
             QUICBase,
-            scenario.input_vocabulary,
+            input_letters,
             args.output_dir,
             eqtests,
         )
-
         lstar = LSTAR(
-            scenario.input_vocabulary, QUICBase, max_states=15, eqtests=eqtests
+            input_letters, QUICBase, max_states=15, eqtests=eqtests
         )
         start = time.time()
         state_machine = lstar.learn()
         end = time.time()
-
         duration = end - start
         log(f"\ntime spent in lstar.learn(): {duration}\n")
         log(f"n_states: {len(state_machine.get_states())}\n")
@@ -378,7 +424,6 @@ def main():
     log(f"n_submitted_queries={QUICBase.stats.nb_submited_query}\n")
     log(f"n_letters={QUICBase.stats.nb_letter}\n")
     log(f"n_submitted_letters={QUICBase.stats.nb_submited_letter}\n")
-
 
 
 if __name__ == "__main__":
