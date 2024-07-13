@@ -110,7 +110,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             print(e)
             return "INTERNAL ERROR DURING EMISSION"
 
-        self.tool.protocol.datagram_received()
+        if self.tool.protocol.datagram_received() is not None:
+            return "Timeout"
         last_events = self.tool.logger.last_events()
 
         try:

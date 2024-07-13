@@ -33,12 +33,13 @@ class QUICClientProtocol:
         for datagram in self.handle.send_handshake_packet():
             self.transmit(datagram, addr)
 
-    def datagram_received(self):
+    def datagram_received(self) -> Optional[str]:
         readable, writeable, errored = select.select([self.sock], [], [],1)
         if self.sock not in readable:
-            return
+            return "Timeout"
         data, addr = self.sock.recvfrom(2048)
         self.handle.receive_datagram(data, addr, now=0.0)
+        return None
 
 
     def connect(self):
