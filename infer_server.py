@@ -111,7 +111,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return "INTERNAL ERROR DURING EMISSION"
 
         if self.tool.protocol.datagram_received() is not None:
-            return "Timeout"
+            return "TIMEOUT"
         last_events = self.tool.logger.last_events()
 
         try:
@@ -367,8 +367,8 @@ def main():
             return
 
         # input_letters = [s for s in scenario.input_vocabulary[1:]]
-        input_letters = [Letter(s) for s in scenario.input_vocabulary[1:]]
-        log(f"input_letters {scenario.input_vocabulary[1:]}\n")
+        input_letters = [Letter(s) for s in scenario.input_vocabulary]
+        log(f"input_letters {scenario.input_vocabulary}\n")
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
         input_sequence = Word(letters=[Letter(s) for s in scenario.input_vocabulary])
