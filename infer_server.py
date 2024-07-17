@@ -43,6 +43,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
     def stop(self):
         self.tool.handle.end_trace_file()
+        self.close()
 
     def stop_target(self):
         pass
@@ -122,10 +123,10 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return ""
 
         for event in last_events:
-            if expected_output is not None:
-                break
-            if "+".join(response) == expected_output:
-                return expected_output
+            # if expected_output is not None:
+            #     break
+            # if "+".join(response) == expected_output:
+            #     return expected_output
             data = event["data"]
             response.append(
                 f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
@@ -138,6 +139,10 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # handle = Handle(configuration=self.configuration)
         # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
         self.tool.reset()
+        print('reset')
+
+    def close(self):
+        self.tool.close()
 
 
 # class TLSServerKnowledgeBase(ActiveKnowledgeBase):
@@ -372,15 +377,15 @@ def main():
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
         input_sequence = Word(letters=[Letter(s) for s in scenario.input_vocabulary])
-        # output_sequence = QUICBase._resolve_word(input_sequence)
+        output_sequence = QUICBase._resolve_word(input_sequence)
         # output_sequence = TLSBase._resolve_word(input_sequence)
-        # output = [list(l.symbols)[0] for l in output_sequence.letters]
-        # last_output = output
-        # repetitions = 1
+        output = [list(l.symbols)[0] for l in output_sequence.letters]
+        last_output = output
+        repetitions = 1
         print('-'*20)
-        # for sent, received in zip(input_letters, output):
-        #     log(f"{sent} => {received}\n")
-        # sys.stdout.flush()
+        for sent, received in zip(input_letters, output):
+            log(f"{sent} => {received}\n")
+        sys.stdout.flush()
 
         eqtests = args.eq_method((QUICBase, input_letters))
         # eqtests = args.eq_method((TLSBase, input_letters))

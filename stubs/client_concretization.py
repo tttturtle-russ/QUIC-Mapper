@@ -55,6 +55,9 @@ class QUICClientInferTool:
     def reset(self):
         self.protocol.reset()
 
+    def close(self):
+        self.protocol.close_sock()
+
 # class InfererTools:
 #     def __init__(self, remote_endpoint, crypto_material, tls_version):
 #         self.remote_endpoint = remote_endpoint

@@ -425,8 +425,8 @@ class Handle:
             if network_path.addr == addr:
                 return network_path
 
-    def initialize(self, peer_cid: bytes):
-        self._initialize(peer_cid=peer_cid)
+    # def initialize(self, peer_cid: bytes):
+    #     self._initialize(peer_cid=peer_cid)
 
     def end_trace_file(self):
         self._configuration.quic_logger.end_trace(self._quic_logger, dump_cid(self._peer_cid.cid))
@@ -566,13 +566,16 @@ class Handle:
                 header = pull_quic_header(
                     buf, host_cid_length=self._configuration.connection_id_length
                 )
-            except ValueError:
+            except ValueError as e:
+                # print(e)
                 if self._quic_logger is not None:
                     self._quic_logger.log_event(
                         category="transport",
                         event="packet_dropped",
                         data={
                             "trigger": "header_parse_error",
+                            "header_type": header.packet_type,
+                            "error": str(e),
                             "raw": {"length": buf.capacity - start_off},
                         },
                     )
@@ -612,30 +615,28 @@ class Handle:
                     )
 
             # # check protocol version
-            # if (
-            #         self._is_client
-            #         and self._state == QuicConnectionState.FIRSTFLIGHT
-            #         and header.version == QuicProtocolVersion.NEGOTIATION
-            #         and not self._version_negotiation_count
-            # ):
+            if (
+                    header.version == QuicProtocolVersion.NEGOTIATION
+            ):
             #     # version negotiation
-            #     versions = []
-            #     while not buf.eof():
-            #         versions.append(buf.pull_uint32())
-            #     if self._quic_logger is not None:
-            #         self._quic_logger.log_event(
-            #             category="transport",
-            #             event="packet_received",
-            #             data={
-            #                 "frames": [],
-            #                 "header": {
-            #                     "packet_type": "version_negotiation",
-            #                     "scid": dump_cid(header.source_cid),
-            #                     "dcid": dump_cid(header.destination_cid),
-            #                 },
-            #                 "raw": {"length": buf.tell() - start_off},
-            #             },
-            #         )
+                versions = []
+                while not buf.eof():
+                    versions.append(buf.pull_uint32())
+                # if self._quic_logger is not None:
+                #     self._quic_logger.log_event(
+                #         category="transport",
+                #         event="packet_received",
+                #         data={
+                #             "frames": [],
+                #             "header": {
+                #                 "packet_type": "version_negotiation",
+                #                 "scid": dump_cid(header.source_cid),
+                #                 "dcid": dump_cid(header.destination_cid),
+                #             },
+                #             "raw": {"length": buf.tell() - start_off},
+                #         },
+                #     )
+                return
             #     if self._version in versions:
             #         self._logger.warning(
             #             "Version negotiation packet contains %s" % self._version
@@ -759,8 +760,16 @@ class Handle:
                         event="packet_dropped",
                         data={"trigger": "key_unavailable"},
                     )
-
                 return
+            except CryptoError as exc:
+                self._logger.debug("Payload decryption failed: %s", exc)
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_dropped",
+                        data={"trigger": "decryption_failed"},
+                    )
+                continue
                 # print("key_unavailable\n")
 
             # check reserved bits
@@ -847,7 +856,7 @@ class Handle:
                 #     reason_phrase=exc.reason_phrase,
                 # )
                 # print("connection error\n")
-            print(("data_received\n"))
+            print(str(header.packet_type)+" data_received\n")
             # if self._state in END_STATES or self._close_pending:
             #     return
 
@@ -2251,7 +2260,11 @@ class Handle:
             buf.push_uint16(len(frame.data) | 0x4000)
             buf.push_bytes(frame.data)
         datagrams, packets = builder.flush()
-        self._packet_number += 1
+        if len(datagrams) != 0:
+            self._write_datagrams('bin/initial.bin', datagrams)
+            self._packet_number += 1
+        else:
+            return self._get_datagrams('bin/initial.bin')
         return datagrams
 
     def send_initial_ack_packet(self):
@@ -2283,8 +2296,10 @@ class Handle:
         # space.ack_at = None
         self._write_ack_frame(builder, space)
         datagrams, packets = builder.flush()
-        self._packet_number += 1
-        if len(datagrams) == 0:
+        if len(datagrams) != 0:
+            self._write_datagrams('bin/initial_ack.bin', datagrams)
+            self._packet_number += 1
+        else:
             return self._get_datagrams('bin/initial_ack.bin')
         return datagrams
 
@@ -2333,8 +2348,10 @@ class Handle:
             buf.push_uint16(len(frame.data) | 0x4000)
             buf.push_bytes(frame.data)
         datagrams, packets = builder.flush()
-        self._packet_number += 1
-        if len(datagrams) == 0:
+        if len(datagrams) != 0:
+            self._write_datagrams('bin/handshake.bin', datagrams)
+            self._packet_number += 1
+        else:
             return self._get_datagrams('bin/handshake.bin')
         return datagrams
 
@@ -2660,3 +2677,9 @@ class Handle:
                     break
                 datagrams.append(datagram)
         return datagrams
+
+    def _write_datagrams(self, file_path, datagrams):
+        with open(file_path, "wb") as f:
+            for datagram in datagrams:
+                f.write(len(datagram).to_bytes(4, 'big'))  # 写入datagram的长度
+                f.write(datagram)

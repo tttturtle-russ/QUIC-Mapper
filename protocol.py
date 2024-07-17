@@ -1,6 +1,7 @@
 # import asyncio
 import select
 import socket
+import time
 
 from aioquic.quic.packet import *
 from aioquic.buffer import *
@@ -14,8 +15,9 @@ class QUICClientProtocol:
         # self.handshake_done = asyncio.Event()
         self.dst_addr = dst_addr
         self.local_addr = local_addr
+        self.port = 10086
         # self._packet_receive_event = asyncio.Event()
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
         # self.sock.bind(local_addr)
         # self.sock.setblocking(False)
         # self.handle.connect()
@@ -34,19 +36,20 @@ class QUICClientProtocol:
             self.transmit(datagram, addr)
 
     def datagram_received(self) -> Optional[str]:
-        readable, writeable, errored = select.select([self.sock], [], [],1)
+        time.sleep(0.8)
+        readable, writeable, errored = select.select([self.sock], [], [],0.5)
         if self.sock not in readable:
             return "Timeout"
         data, addr = self.sock.recvfrom(2048)
         self.handle.receive_datagram(data, addr, now=0.0)
         return None
 
-
     def connect(self):
         print('connect\n')
         addr = self.dst_addr
         for datagram in self.handle.connect(addr):
             self.transmit(datagram, addr)
+
     def transmit(self, data, addr):
         self.sock.sendto(data, addr)
 
@@ -83,7 +86,14 @@ class QUICClientProtocol:
         self.handle.end_trace_file()
 
     def reset(self):
+        self.handle.end_trace_file()
         self.handle.reset(self.dst_addr)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.port += 1
+        self.local_addr = ("172.17.0.1", self.port)
+        self.sock.bind(self.local_addr)
 
+    def close_sock(self):
+        self.sock.close()
 
 
