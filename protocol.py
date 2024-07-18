@@ -36,7 +36,7 @@ class QUICClientProtocol:
             self.transmit(datagram, addr)
 
     def datagram_received(self) -> Optional[str]:
-        time.sleep(0.8)
+        time.sleep(0.1)
         readable, writeable, errored = select.select([self.sock], [], [],0.5)
         if self.sock not in readable:
             return "Timeout"

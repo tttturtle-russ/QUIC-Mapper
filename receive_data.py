@@ -622,20 +622,20 @@ class Handle:
                 versions = []
                 while not buf.eof():
                     versions.append(buf.pull_uint32())
-                # if self._quic_logger is not None:
-                #     self._quic_logger.log_event(
-                #         category="transport",
-                #         event="packet_received",
-                #         data={
-                #             "frames": [],
-                #             "header": {
-                #                 "packet_type": "version_negotiation",
-                #                 "scid": dump_cid(header.source_cid),
-                #                 "dcid": dump_cid(header.destination_cid),
-                #             },
-                #             "raw": {"length": buf.tell() - start_off},
-                #         },
-                #     )
+                if self._quic_logger is not None:
+                    self._quic_logger.log_event(
+                        category="transport",
+                        event="packet_received",
+                        data={
+                            "frames": [],
+                            "header": {
+                                "packet_type": "version_negotiation",
+                                "scid": dump_cid(header.source_cid),
+                                "dcid": dump_cid(header.destination_cid),
+                            },
+                            "raw": {"length": buf.tell() - start_off},
+                        },
+                    )
                 return
             #     if self._version in versions:
             #         self._logger.warning(
@@ -2297,7 +2297,7 @@ class Handle:
         self._write_ack_frame(builder, space)
         datagrams, packets = builder.flush()
         if len(datagrams) != 0:
-            self._write_datagrams('bin/initial_ack.bin', datagrams)
+            # self._write_datagrams('bin/initial_ack.bin', datagrams)
             self._packet_number += 1
         else:
             return self._get_datagrams('bin/initial_ack.bin')
@@ -2559,8 +2559,9 @@ class Handle:
         return datagrams
 
     def _write_ack_frame(self, builder, space: QuicPacketSpace):
-        if space.ack_at is None:
-            return
+        # if space.ack_at is None:
+            # space.ack_queue = RangeSet(0, 1)
+
         ack_delay = self._ack_delay
         ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
 
@@ -2683,3 +2684,4 @@ class Handle:
             for datagram in datagrams:
                 f.write(len(datagram).to_bytes(4, 'big'))  # 写入datagram的长度
                 f.write(datagram)
+        # pass
