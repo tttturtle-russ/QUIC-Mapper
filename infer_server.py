@@ -313,6 +313,7 @@ def main():
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
+    local_addr = "172.17.0.1"
     QUICBase = QUICServerKnowledgeBase(configuration, ("172.17.0.2", 4433), ("172.17.0.1", 10011), handle, options=args)
 
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
