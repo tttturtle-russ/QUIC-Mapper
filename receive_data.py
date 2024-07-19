@@ -431,6 +431,9 @@ class Handle:
     def end_trace_file(self):
         self._configuration.quic_logger.end_trace(self._quic_logger, dump_cid(self._peer_cid.cid))
 
+    def end_trace(self):
+        self._configuration.quic_logger.end_trace(self._quic_logger)
+
     def datagrams_to_send(self, now: float) -> List[Tuple[bytes, NetworkAddress]]:
         """
         Return a list of `(data, addr)` tuples of datagrams which need to be
@@ -2559,8 +2562,11 @@ class Handle:
         return datagrams
 
     def _write_ack_frame(self, builder, space: QuicPacketSpace):
-        # if space.ack_at is None:
-            # space.ack_queue = RangeSet(0, 1)
+        if space.ack_at is None:
+            if space.largest_received_packet > 0:
+                space.ack_queue = RangeSet([range(space.largest_received_packet - 1, space.largest_received_packet)])
+            else:
+                space.ack_queue = RangeSet([range(0, 1)])
 
         ack_delay = self._ack_delay
         ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent

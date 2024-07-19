@@ -249,3 +249,5 @@ cython_debug/
 *.qlog
 *.json
 >>>>>>> Stashed changes
+
+/log

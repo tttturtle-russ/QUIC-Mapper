@@ -61,7 +61,7 @@ class QuicLoggerTrace:
         result = []
         # Since we cannot slice deques efficiently, we iterate manually
         for i, event in enumerate(self._events):
-            if i >= self.index and event["event"] == "packet_received":
+            if i >= self.index and event["event"] == "packet_received" and event["data"]["frames"] != "ping":
                 result.append(event)
         self.index = len(self._events)
         return result
@@ -79,7 +79,7 @@ class QuicLoggerTrace:
         attrs = {
             "error_code": error_code,
             "error_space": "application" if frame_type is None else "transport",
-            "frame_type": "connection_close",
+            "frame_type": "CC",
             "raw_error_code": error_code,
             "reason": reason_phrase,
         }

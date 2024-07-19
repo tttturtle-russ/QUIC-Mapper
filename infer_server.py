@@ -24,7 +24,7 @@ from HappyPathFirst import HappyPathFirst
 from StoreHypotheses import StoreHypotheses
 # from stubs.client_concretization import InfererTools
 from automata.automata import convert_from_pylstar
-from logger import QuicFileLogger
+from logger import QuicFileLogger , QuicLogger
 from stubs.client_concretization import QUICClientInferTool
 
 
@@ -37,13 +37,16 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.tool = QUICClientInferTool(configuration, dst_addr, local_addr, handle)
         self.options = options
         self.learned = False
+        self.CC = False
 
     def start(self):
         pass
 
     def stop(self):
-        self.tool.handle.end_trace_file()
+        # self.tool.handle.end_trace_file()
+        self.tool.handle.end_trace()
         self.close()
+
 
     def stop_target(self):
         pass
@@ -96,6 +99,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         return Word(letters=output_letters)
 
     def send_and_receive(self, expected_output, symbols):
+        if self.CC is True:
+            return "CC"
         try:
             self.tool.concretize_client_messages(symbols)
         except BrokenPipeError:
@@ -118,7 +123,16 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         try:
             event = last_events.pop(0)
             data = event["data"]
+            tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
+            if 'ping' in tmp:
+                return ''
+            if "CC" in tmp:
+                self.CC = True
+                return "CC"
             response = [f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"]
+            # if response == '1RTT_ping:padding':
+            #     response = []
+            #     return ''
         except IndexError:
             return ""
 
@@ -128,9 +142,17 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             # if "+".join(response) == expected_output:
             #     return expected_output
             data = event["data"]
-            response.append(
-                f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
-            )
+            tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
+            if tmp == '1RTT_ping:padding':
+                continue
+            if "CC" in tmp:
+                self.CC = True
+                return "CC"
+            # response.append(
+            #     f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
+            # )
+            else:
+                response.append(tmp)
 
         print("+".join(response))
         return "+".join(response)
@@ -139,7 +161,9 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # handle = Handle(configuration=self.configuration)
         # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
         self.tool.reset()
+        self.CC = False
         print('reset')
+
 
     def close(self):
         self.tool.close()
@@ -285,7 +309,8 @@ def main():
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
-    quic_logger = QuicFileLogger(os.getcwd())
+    # quic_logger = QuicFileLogger(os.getcwd())
+    quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     QUICBase = QUICServerKnowledgeBase(configuration, ("172.17.0.2", 4433), ("172.17.0.1", 10011), handle, options=args)
@@ -373,6 +398,7 @@ def main():
 
         # input_letters = [s for s in scenario.input_vocabulary[1:]]
         input_letters = [Letter(s) for s in scenario.input_vocabulary]
+        input_letters_str = [s for s in scenario.input_vocabulary]
         log(f"input_letters {scenario.input_vocabulary}\n")
         log(f"eqtests: {args.eq_method_str}\n")
         log(f"timeout: {args.timeout}\n")
@@ -401,7 +427,7 @@ def main():
             eqtests,
         )
         lstar = LSTAR(
-            input_letters, QUICBase, max_states=15, eqtests=eqtests
+            input_letters_str, QUICBase, max_states=15, eqtests=eqtests
         )
         start = time.time()
         state_machine = lstar.learn()
