@@ -45,7 +45,7 @@ async def main():
     async with run_server(host="127.0.0.1") as port:
         print(f"Server is running on port {port}")
         # 这里可以插入你的代码，例如等待用户输入或者处理其他事件
-        await asyncio.sleep(3600)  # 例如，让服务器运行一小时
+        await asyncio.sleep(7200)  # 例如，让服务器运行一小时
 
 # 运行主函数
 asyncio.run(main())

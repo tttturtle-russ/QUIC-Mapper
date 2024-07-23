@@ -1,4 +1,6 @@
 import asyncio
+import time
+
 from aioquic.quic.packet import *
 from aioquic.buffer import *
 from receive_data import *
@@ -6,6 +8,8 @@ from protocol import *
 from aioquic.quic.configuration import QuicConfiguration
 
 QUANT_SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "dummy.ca.crt")
+AIOQUIC_SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
+QUICHE_SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "cert.crt")
 
 
 # async def start_quic_client(destination_addr, local_addr, handle):
@@ -31,32 +35,52 @@ def main():
     addr = ("172.17.0.2", 4433)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
-    configuration.load_verify_locations(cadata=None, cafile=QUANT_SERVER_CACERTFILE)  # CA certificate can be changed
+    configuration.load_verify_locations(cadata=None, cafile=QUICHE_SERVER_CACERTFILE)  # CA certificate can be changed
     quic_logger = QuicFileLogger(os.getcwd())
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = ("172.17.0.1", 10011)
+    local_addr = '172.17.0.1'
     # transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
     protocol = QUICClientProtocol(addr, local_addr, handle)
     # try:
     protocol.reset()
     protocol.connect()
-    protocol.datagram_received()
+    # time.sleep(1)
+    while 1:
+        tmp = protocol.datagram_received()
+        if tmp is not None:
+            print(tmp)
+        else:
+            break
+
+    # protocol.end_trace()
+    protocol.initial_ack_packet()
+    # time.sleep(1)
+    # while protocol.datagram_received() is None:
+    #     pass
+    # # protocol.handshake_close()
+    # # protocol.initial_close()
+    while 1:
+        tmp = protocol.datagram_received()
+        if tmp is not None:
+            print(tmp)
+        else:
+            break
     protocol.end_trace()
     protocol.close_sock()
     # await asyncio.sleep(0.1)
-    protocol.reset()
-    protocol.connect()
+    # protocol.reset()
+    # protocol.connect()
     # protocol.initial_ack_packet()
-    protocol.datagram_received()
-    protocol.end_trace()
-    protocol.close_sock()
-    protocol.reset()
-    protocol.connect()
-    protocol.datagram_received()
-    protocol.end_trace()
+    # protocol.datagram_received()
+    # protocol.end_trace()
+    # protocol.close_sock()
+    # protocol.reset()
+    # protocol.connect()
+    # protocol.datagram_received()
+    # protocol.end_trace()
     # protocol.initial_close()
     # protocol.handshake_packet()
     # protocol.datagram_received()

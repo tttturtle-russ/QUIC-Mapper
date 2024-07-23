@@ -8,14 +8,14 @@ from protocol import QUICClientProtocol
 
 
 class QUICClientInferTool:
-    def __init__(self, configuration, dst_addr, local_addr, handle):
+    def __init__(self, configuration, dst_addr, local_addr, local_port, handle):
         self.handle = handle
         self.configuration = configuration
         self.logger = configuration.quic_logger
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.transport = None
-        self.protocol = QUICClientProtocol(dst_addr, local_addr, handle)
+        self.protocol = QUICClientProtocol(dst_addr, local_addr, handle ,local_port=local_port)
         self.local_endpoint = local_addr
 
 

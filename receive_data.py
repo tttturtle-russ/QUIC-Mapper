@@ -418,6 +418,8 @@ class Handle:
             0x30: (self._handle_datagram_frame, EPOCHS("01")),
             0x31: (self._handle_datagram_frame, EPOCHS("01")),
         }
+        self.initial_send = False
+
 
     def _find_network_path(self, addr: NetworkAddress) -> QuicNetworkPath:
         # check existing network paths
@@ -562,6 +564,7 @@ class Handle:
         # for servers, arm the idle timeout on the first datagram
         # if self._close_at is None:
         #     self._close_at = now + self._idle_timeout()
+        log = []
         buf = Buffer(data=data)
         while not buf.eof():
             start_off = buf.tell()
@@ -582,7 +585,7 @@ class Handle:
                             "raw": {"length": buf.capacity - start_off},
                         },
                     )
-                return
+                return '+'.join(log)
             # RFC 9000 section 14.1 requires servers to drop all initial packets
             # # contained in a datagram smaller than 1200 bytes.
             # if (
@@ -619,7 +622,7 @@ class Handle:
 
             # # check protocol version
             if (
-                    header.version == QuicProtocolVersion.NEGOTIATION
+                header.version == QuicProtocolVersion.NEGOTIATION
             ):
             #     # version negotiation
                 versions = []
@@ -639,7 +642,10 @@ class Handle:
                             "raw": {"length": buf.tell() - start_off},
                         },
                     )
-                return
+
+                tmp = 'VG_:' + ':'.join(versions)
+                log.append(tmp)
+                return "+".join(log)
             #     if self._version in versions:
             #         self._logger.warning(
             #             "Version negotiation packet contains %s" % self._version
@@ -763,7 +769,7 @@ class Handle:
                         event="packet_dropped",
                         data={"trigger": "key_unavailable"},
                     )
-                return
+                return "+".join(log)
             except CryptoError as exc:
                 self._logger.debug("Payload decryption failed: %s", exc)
                 if self._quic_logger is not None:
@@ -786,11 +792,12 @@ class Handle:
                 #     frame_type=QuicFrameType.PADDING,
                 #     reason_phrase="Reserved bits must be zero",
                 # )
-                return
+                return '+'.join(log)
 
             # log packet
             quic_logger_frames: Optional[List[Dict]] = None
             if self._quic_logger is not None:
+                log_packet = self._quic_logger.packet_type(header.packet_type)
                 quic_logger_frames = []
                 self._quic_logger.log_event(
                     category="transport",
@@ -859,7 +866,7 @@ class Handle:
                 #     reason_phrase=exc.reason_phrase,
                 # )
                 # print("connection error\n")
-            print(str(header.packet_type)+" data_received\n")
+            # print(str(header.packet_type)+" data_received\n")
             # if self._state in END_STATES or self._close_pending:
             #     return
 
@@ -903,6 +910,12 @@ class Handle:
                 space.ack_queue.add(packet_number)
                 if is_ack_eliciting and space.ack_at is None:
                     space.ack_at = now + self._ack_delay
+
+            tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
+            if 'ping' not in tmp:
+                log.append(tmp)
+
+        return "+".join(log)
 
     def _payload_received(
             self,
@@ -2309,6 +2322,8 @@ class Handle:
     def send_handshake_packet(self):
         # if self._handshake_confirmed is False:
         #     return
+        if self.initial_send is False:
+            return self._get_datagrams('bin/handshake.bin')
         builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
@@ -2322,7 +2337,10 @@ class Handle:
         # crypto_stream = self._crypto_streams[tls.Epoch.HANDSHAKE]
         space = self._spaces[tls.Epoch.HANDSHAKE]
         # packet_type = PACKET_TYPE_HANDSHAKE
-        builder.start_packet(PACKET_TYPE_HANDSHAKE, crypto)
+        try:
+            builder.start_packet(PACKET_TYPE_HANDSHAKE, crypto)
+        except Exception:
+            pass
 
         # ack_delay = self._ack_delay
         # ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
@@ -2388,6 +2406,7 @@ class Handle:
         self.tls.handle_message(b'', self._crypto_buffers)
         self._push_crypto_data()
         datagrams = self.send_initial_packet()
+        self.initial_send = True
         # datagrams = self.send_handshake_packet()
         return datagrams
 
@@ -2512,12 +2531,14 @@ class Handle:
             max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.HANDSHAKE]
-        builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
-        self._write_ack_frame(builder, space)
-        self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
-        datagrams, packets = builder.flush()
-        if len(datagrams) == 0:
-            return self._get_datagrams("bin/handshake_close.bin")
+        try:
+            builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
+            self._write_ack_frame(builder, space)
+            self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
+            datagrams, packets = builder.flush()
+        except Exception:
+            if len(datagrams) == 0:
+                return self._get_datagrams("bin/handshake_close.bin")
         return datagrams
 
     def send_1rtt_close(self):
@@ -2563,10 +2584,7 @@ class Handle:
 
     def _write_ack_frame(self, builder, space: QuicPacketSpace):
         if space.ack_at is None:
-            if space.largest_received_packet > 0:
-                space.ack_queue = RangeSet([range(space.largest_received_packet - 1, space.largest_received_packet)])
-            else:
-                space.ack_queue = RangeSet([range(0, 1)])
+                space.ack_queue = RangeSet([range(9999, 10000)])
 
         ack_delay = self._ack_delay
         ack_delay_encoded = int(ack_delay * 1000000) >> self._local_ack_delay_exponent
@@ -2686,8 +2704,8 @@ class Handle:
         return datagrams
 
     def _write_datagrams(self, file_path, datagrams):
-        with open(file_path, "wb") as f:
-            for datagram in datagrams:
-                f.write(len(datagram).to_bytes(4, 'big'))  # 写入datagram的长度
-                f.write(datagram)
-        # pass
+        # with open(file_path, "wb") as f:
+        #     for datagram in datagrams:
+        #         f.write(len(datagram).to_bytes(4, 'big'))  # 写入datagram的长度
+        #         f.write(datagram)
+        pass

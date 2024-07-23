@@ -5,6 +5,7 @@ import os.path
 import sys
 import time
 import logging
+import typing
 
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.packet import QuicProtocolVersion
@@ -29,15 +30,18 @@ from stubs.client_concretization import QUICClientInferTool
 
 
 class QUICServerKnowledgeBase(ActiveKnowledgeBase):
-    def __init__(self, configuration, dst_addr, local_addr, handle, options):
+    def __init__(self, configuration, dst_addr, local_addr, local_port, handle, options):
         super().__init__()
         self.configuration = configuration
         self.dst_addr = dst_addr
         self.local_addr = local_addr
-        self.tool = QUICClientInferTool(configuration, dst_addr, local_addr, handle)
+        self.tool = QUICClientInferTool(configuration, dst_addr, local_addr, local_port, handle)
         self.options = options
         self.learned = False
         self.CC = False
+        self.timeout_set = 1.0
+        self.timeout_real = self.timeout_set
+        self.pre_msg = None
 
     def start(self):
         pass
@@ -99,6 +103,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         return Word(letters=output_letters)
 
     def send_and_receive(self, expected_output, symbols):
+        start = time.time()
+        print('expected_output:', expected_output)
         if self.CC is True:
             return "CC"
         try:
@@ -109,170 +115,79 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return "EOF"
         # pylint: disable=broad-except
         except Exception as e:
-            # if e == '<Epoch.INITIAL: 0>' or e == '<Epoch.HANDSHAKE: 2>' or e == '<Epoch.ONE_RTT: 3>':
-            # return "EOF"
-            # pass
-            # else:
-            print(e)
-            return "INTERNAL ERROR DURING EMISSION"
-
-        if self.tool.protocol.datagram_received() is not None:
-            return "TIMEOUT"
-        last_events = self.tool.logger.last_events()
-
-        try:
-            event = last_events.pop(0)
-            data = event["data"]
-            tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
-            if 'ping' in tmp:
-                return ''
-            if "CC" in tmp:
-                self.CC = True
-                return "CC"
-            response = [f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"]
-            # if response == '1RTT_ping:padding':
-            #     response = []
-            #     return ''
-        except IndexError:
-            return ""
-
-        for event in last_events:
-            # if expected_output is not None:
-            #     break
-            # if "+".join(response) == expected_output:
-            #     return expected_output
-            data = event["data"]
-            tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
-            if tmp == '1RTT_ping:padding':
-                continue
-            if "CC" in tmp:
-                self.CC = True
-                return "CC"
-            # response.append(
-            #     f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
-            # )
+            if str(e) == 'Encryption key is not available':
+                pass
             else:
-                response.append(tmp)
+                print(e)
+                return "INTERNAL ERROR DURING EMISSION"
 
-        print("+".join(response))
-        return "+".join(response)
+        response = self.receive()
+        if response == '':
+            return 'TIMEOUT'
+        if not response:
+            return 'TIMEOUT'
+
+
+        while expected_output != '+'.join(response) or expected_output is None:
+            next_msg = self.receive()
+            if not next_msg:
+                break
+            # if next_msg == self.pre_msg:
+            #     continue
+            self.pre_msg = next_msg
+            response += '+' + next_msg
+
+        if not response:
+            end = time.time()
+            timeout = end - start
+            self.timeout_real = max(self.timeout_set, timeout*4)
+            return 'TIMEOUT'
+
+        # print("+".join(response))
+        print('response:', response)
+        end = time.time()
+        timeout = end - start
+        self.timeout_real = max(self.timeout_set, timeout*4)
+        # return "+".join(response)
+        return response
 
     def reset(self):
         # handle = Handle(configuration=self.configuration)
         # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
         self.tool.reset()
         self.CC = False
-        print('reset')
+        print('-' * 20)
+        print('-'*10 + ' reset '+'-'*10)
+
 
 
     def close(self):
         self.tool.close()
 
+    def receive(self):
+        msg = self.tool.protocol.datagram_received(timeout=self.timeout_real)
 
-# class TLSServerKnowledgeBase(ActiveKnowledgeBase):
-#     def __init__(self, tls_version, options):
-#         super().__init__()
-#         self.tools = InfererTools(
-#             options.remote_endpoint,
-#             options.crypto_material,
-#             tls_version,
-#         )
-#         self.tls_session = None
-#         self.options = options
-#
-#     def start(self):
-#         pass
-#
-#     def stop(self):
-#         pass
-#
-#     def start_target(self):
-#         pass
-#
-#     def stop_target(self):
-#         if self.tls_session:
-#             self.tls_session.stop()
-#
-#     def submit_word(self, word):
-#         n = len(word.letters)
-#
-#         expected_letters = get_expected_output(word, self.knowledge_tree)
-#         if len(expected_letters) == n:
-#             return Word(letters=expected_letters)
-#
-#         self.tls_session = self.tools.get_tls_session()
-#
-#         output_letters = []
-#         for i in range(n):
-#             if self.options.verbose:
-#                 msg_to_send = "+".join(list(word.letters[i].symbols))
-#                 self.options.log(msg_to_send)
-#
-#             expected_letter = None
-#             if expected_letters:
-#                 expected_letter = expected_letters.pop(0)
-#
-#             output_letter = self.send_and_receive(
-#                 expected_letter, word.letters[i].symbols
-#             )
-#
-#             if self.options.verbose:
-#                 self.options.log(f" => {output_letter}\n")
-#
-#             output_letters.append(Letter(output_letter))
-#             if output_letter == "EOF":
-#                 output_letters = fill_answer_with(output_letters, "EOF", n)
-#                 break
-#
-#         if self.options.verbose:
-#             self.options.log("\n")
-#         return Word(letters=output_letters)
-#
-#     def send_and_receive(self, expected_output, symbols):
-#         try:
-#             self.tools.concretize_client_messages(self.tls_session, symbols)
-#             if symbols == {"TLSHardCodedFinished"}:
-#                 raw_client_finished = b"\x16\x03\x01\x00\x40" + (b"\xff" * 64)
-#                 self.tls_session.socket.send_and_receive(raw_client_finished)
-#             else:
-#                 self.tls_session.flush_records()
-#         except BrokenPipeError:
-#             return "EOF"
-#         except ConnectionResetError:
-#             return "EOF"
-#         # pylint: disable=broad-except
-#         except Exception:
-#             return "INTERNAL ERROR DURING EMISSION"
-#
-#         # Possible shortcut
-#         if expected_output == "No RSP":
-#             if self.options.expected_minimal_timeout > 0:
-#                 real_timeout = min(
-#                     self.options.expected_minimal_timeout, self.options.timeout
-#                 )
-#             else:
-#                 return "No RSP"
-#         else:
-#             real_timeout = self.options.timeout
-#
-#         # Read the answer
-#         try:
-#             response = read_next_msg(self.tls_session, timeout=real_timeout)
-#             if response is None:
-#                 return "EOF"
-#             if not response:
-#                 return "No RSP"
-#
-#             while expected_output is None or expected_output != "+".join(response):
-#                 next_msg = read_next_msg(self.tls_session, timeout=self.options.timeout)
-#                 if not next_msg:  # Covers next_msg is None and next_msg = []
-#                     break
-#                 response += next_msg
-#             return "+".join(response)
-#         # pylint: disable=broad-except
-#         except Exception:
-#             return "INTERNAL ERROR DURING RECEPTION"
+        if (msg is None):
+            print('no data')
+            return None
+        print('data yes')
+        if 'CC' in msg:
+            self.CC = True
+        # last_events = self.tool.logger.last_events()
 
+        # response = []
+
+        # for event in last_events:
+        #     data = event["data"]
+        #     tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
+        #     if 'ping' in tmp:
+        #         continue
+        #     if "CC" in tmp:
+        #         self.CC = True
+        #         return [tmp]
+        #     response.append(tmp)
+
+        return msg
 
 def log_fn(log_file, s):
     print(s, end="")
@@ -305,7 +220,7 @@ def main():
 
     # TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
 
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "dummy.ca.crt")
+    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
@@ -313,8 +228,9 @@ def main():
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
-    local_addr = "172.17.0.1"
-    QUICBase = QUICServerKnowledgeBase(configuration, ("172.17.0.2", 4433), ("172.17.0.1", 10011), handle, options=args)
+    local_addr = "127.0.0.1"
+    local_port = 10087
+    QUICBase = QUICServerKnowledgeBase(configuration, ("127.0.0.1",10086), local_addr,local_port, handle, options=args)
 
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
     logging.getLogger("RandomWalkMethod").setLevel(logging.DEBUG)
