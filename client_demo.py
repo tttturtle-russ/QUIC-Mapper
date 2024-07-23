@@ -32,7 +32,7 @@ QUICHE_SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "cert.crt")
 
 def main():
     # loop = asyncio.get_running_loop()
-    addr = ("172.17.0.2", 4433)
+    dst_addr = ("172.17.0.2", 4433)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=QUICHE_SERVER_CACERTFILE)  # CA certificate can be changed
@@ -41,9 +41,10 @@ def main():
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
     local_addr = '172.17.0.1'
+    local_port = 11451
     # transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
-    protocol = QUICClientProtocol(addr, local_addr, handle)
+    protocol = QUICClientProtocol(dst_addr, local_addr, handle, local_port=local_port)
     # try:
     protocol.reset()
     protocol.connect()
