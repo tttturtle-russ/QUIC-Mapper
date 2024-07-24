@@ -1,5 +1,7 @@
 import asyncio
 import time
+import ssl
+
 
 from aioquic.quic.packet import *
 from aioquic.buffer import *
@@ -52,7 +54,8 @@ def main():
     dst_addr = ("172.17.0.6", 4433)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
-    configuration.load_verify_locations(cadata=None, cafile=None)  # CA certificate can be changed
+    configuration.load_verify_locations(cadata=None, cafile=None) # CA certificate can be changed
+    configuration.verify_mode = ssl.CERT_NONE # important for client disable CA verification
     quic_logger = QuicFileLogger(os.getcwd())
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)

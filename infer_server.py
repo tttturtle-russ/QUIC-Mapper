@@ -5,6 +5,7 @@ import os.path
 import sys
 import time
 import logging
+import ssl
 import typing
 
 from aioquic.quic.configuration import QuicConfiguration
@@ -39,7 +40,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.options = options
         self.learned = False
         self.CC = False
-        self.timeout_set = 1.0
+        self.timeout_set = options.timeout
         self.timeout_real = self.timeout_set
         self.pre_msg = None
 
@@ -163,7 +164,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.tool.close()
 
     def receive(self):
-        msg = self.tool.protocol.datagram_received()
+        msg = self.tool.protocol.datagram_received(timeout=self.timeout_set)
 
         if msg is None:
             print('no data')
@@ -199,12 +200,13 @@ def main():
             encoding="utf-8",
     ) as scenario_file:
         scenario = config.scenarios.load_scenario(scenario_file)
-    cert_name = args.cert
+    # cert_name = args.cert
     # cert_name = 'server.crt'
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", cert_name)
+    # SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", cert_name)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
-    configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
+    configuration.load_verify_locations(cadata=None, cafile=None)  # CA certificate can be changed
+    configuration.verify_mode = ssl.CERT_NONE  # important for client disable CA verification
     # quic_logger = QuicFileLogger(os.getcwd())
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger

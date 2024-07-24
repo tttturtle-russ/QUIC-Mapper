@@ -148,6 +148,17 @@ class Limit:
         self.used = 0
         self.value = value
 
+def stream_is_client_initiated(stream_id: int) -> bool:
+    """
+    Returns True if the stream is client initiated.
+    """
+    return not (stream_id & 1)
+
+def stream_is_unidirectional(stream_id: int) -> bool:
+    """
+    Returns True if the stream is unidirectional.
+    """
+    return bool(stream_id & 2)
 
 @dataclass
 class QuicNetworkPath:
@@ -429,6 +440,17 @@ class Handle:
 
     # def initialize(self, peer_cid: bytes):
     #     self._initialize(peer_cid=peer_cid)
+
+    def _assert_stream_can_receive(self, frame_type: int, stream_id: int) -> None:
+        """
+        Check the specified stream can receive data or raises a QuicConnectionError.
+        """
+        if not self._stream_can_receive(stream_id):
+            raise QuicConnectionError(
+                error_code=QuicErrorCode.STREAM_STATE_ERROR,
+                frame_type=frame_type,
+                reason_phrase="Stream is send-only",
+            )
 
     def end_trace_file(self):
         self._configuration.quic_logger.end_trace(self._quic_logger, dump_cid(self._peer_cid.cid))
@@ -1818,33 +1840,33 @@ class Handle:
         self._assert_stream_can_receive(frame_type, stream_id)
 
         # check flow-control limits
-        stream = self._get_or_create_stream(frame_type, stream_id)
-        if offset + length > stream.max_stream_data_local:
-            raise QuicConnectionError(
-                error_code=QuicErrorCode.FLOW_CONTROL_ERROR,
-                frame_type=frame_type,
-                reason_phrase="Over stream data limit",
-            )
-        newly_received = max(0, offset + length - stream.receiver.highest_offset)
-        if self._local_max_data.used + newly_received > self._local_max_data.value:
-            raise QuicConnectionError(
-                error_code=QuicErrorCode.FLOW_CONTROL_ERROR,
-                frame_type=frame_type,
-                reason_phrase="Over connection data limit",
-            )
+        # stream = self._get_or_create_stream(frame_type, stream_id)
+        # if offset + length > stream.max_stream_data_local:
+        #     raise QuicConnectionError(
+        #         error_code=QuicErrorCode.FLOW_CONTROL_ERROR,
+        #         frame_type=frame_type,
+        #         reason_phrase="Over stream data limit",
+        #     )
+        # newly_received = max(0, offset + length - stream.receiver.highest_offset)
+        # if self._local_max_data.used + newly_received > self._local_max_data.value:
+        #     raise QuicConnectionError(
+        #         error_code=QuicErrorCode.FLOW_CONTROL_ERROR,
+        #         frame_type=frame_type,
+        #         reason_phrase="Over connection data limit",
+        #     )
 
         # process data
-        try:
-            event = stream.receiver.handle_frame(frame)
-        except FinalSizeError as exc:
-            raise QuicConnectionError(
-                error_code=QuicErrorCode.FINAL_SIZE_ERROR,
-                frame_type=frame_type,
-                reason_phrase=str(exc),
-            )
-        if event is not None:
-            self._events.append(event)
-        self._local_max_data.used += newly_received
+        # try:
+        #     event = stream.receiver.handle_frame(frame)
+        # except FinalSizeError as exc:
+        #     raise QuicConnectionError(
+        #         error_code=QuicErrorCode.FINAL_SIZE_ERROR,
+        #         frame_type=frame_type,
+        #         reason_phrase=str(exc),
+        #     )
+        # if event is not None:
+        #     self._events.append(event)
+        # self._local_max_data.used += newly_received
 
     def _handle_stream_data_blocked_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
@@ -2211,6 +2233,11 @@ class Handle:
             return True
 
         return False
+
+    def _stream_can_receive(self, stream_id: int) -> bool:
+        return stream_is_client_initiated(
+            stream_id
+        ) != self._is_client or not stream_is_unidirectional(stream_id)
 
     # def _write_ack_frame(
     #     self, builder: QuicPacketBuilder, space: QuicPacketSpace, now: float
