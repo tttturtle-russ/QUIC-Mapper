@@ -643,7 +643,12 @@ class Handle:
                         },
                     )
 
-                tmp = 'VG_:' + ':'.join(versions)
+                tmp = 'VG_:' + ':'.join([hex(num)[2:] for num in versions])
+                log.append(tmp)
+                return "+".join(log)
+
+            if header.packet_type == PACKET_TYPE_RETRY:
+                tmp = 'Retry'
                 log.append(tmp)
                 return "+".join(log)
             #     if self._version in versions:
@@ -912,9 +917,14 @@ class Handle:
                     space.ack_at = now + self._ack_delay
 
             tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
-            if 'ping' not in tmp:
+            # if 'ping' not in tmp:
+            tmp = tmp.replace('1RTT_ping:padding', '')
+            tmp = tmp.replace('initial_ping:padding', '')
+            tmp = tmp.replace('handshake_ping:padding', '')
+            if tmp != '':
                 log.append(tmp)
 
+        filtered_strings = [s for s in log if s != ""]
         return "+".join(log)
 
     def _payload_received(
@@ -1101,6 +1111,7 @@ class Handle:
         """
         Handle an ACK frame.
         """
+        # print('ack frame')
         ack_rangeset, ack_delay_encoded = pull_ack_frame(buf)
         if frame_type == QuicFrameType.ACK_ECN:
             buf.pull_uint_var()
@@ -1578,6 +1589,7 @@ class Handle:
         """
         Handle a PADDING frame.
         """
+        # print('padding frame')
         # consume padding
         pos = buf.tell()
         for byte in buf.data_slice(pos, buf.capacity):
@@ -2521,6 +2533,8 @@ class Handle:
         return datagrams
 
     def send_handshake_close(self):
+        if self.initial_send is False:
+            return self._get_datagrams("bin/handshake_close.bin")
         builder = QuicPacketBuilder(
             host_cid=self.host_cid,
             is_client=True,
@@ -2531,14 +2545,12 @@ class Handle:
             max_datagram_size=self._max_datagram_size,
         )
         space = self._spaces[tls.Epoch.HANDSHAKE]
-        try:
-            builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
-            self._write_ack_frame(builder, space)
-            self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
-            datagrams, packets = builder.flush()
-        except Exception:
-            if len(datagrams) == 0:
-                return self._get_datagrams("bin/handshake_close.bin")
+        builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
+        self._write_ack_frame(builder, space)
+        self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
+        datagrams, packets = builder.flush()
+        if len(datagrams) == 0:
+            return self._get_datagrams("bin/handshake_close.bin")
         return datagrams
 
     def send_1rtt_close(self):

@@ -122,8 +122,6 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                 return "INTERNAL ERROR DURING EMISSION"
 
         response = self.receive()
-        if response == '':
-            return 'TIMEOUT'
         if not response:
             return 'TIMEOUT'
 
@@ -165,27 +163,14 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.tool.close()
 
     def receive(self):
-        msg = self.tool.protocol.datagram_received(timeout=self.timeout_real)
+        msg = self.tool.protocol.datagram_received()
 
-        if (msg is None):
+        if msg is None:
             print('no data')
             return None
         print('data yes')
         if 'CC' in msg:
             self.CC = True
-        # last_events = self.tool.logger.last_events()
-
-        # response = []
-
-        # for event in last_events:
-        #     data = event["data"]
-        #     tmp = f"{data['header']['packet_type']}_{':'.join(frame['frame_type'] for frame in data['frames'])}"
-        #     if 'ping' in tmp:
-        #         continue
-        #     if "CC" in tmp:
-        #         self.CC = True
-        #         return [tmp]
-        #     response.append(tmp)
 
         return msg
 
@@ -209,18 +194,14 @@ def main():
 
     # dirname = os.path.dirname(sys.argv[1])
     with open(
-            f"./scenarios/test.scenario",
+            f"./scenarios/test.scenario.old",
             "r",
             encoding="utf-8",
     ) as scenario_file:
-        #     crypto_material_names = [name for name in args.crypto_material.iter_names()]
         scenario = config.scenarios.load_scenario(scenario_file)
-    # if scenario.role != "client":
-    #     raise Exception("Invalid scenario (expecting a client role)")
-
-    # TLSBase = TLSServerKnowledgeBase(scenario.tls_version, options=args)
-
-    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", "pycacert.pem")
+    cert_name = args.cert
+    # cert_name = 'server.crt'
+    SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", cert_name)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=SERVER_CACERTFILE)  # CA certificate can be changed
@@ -228,9 +209,14 @@ def main():
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
-    local_addr = "127.0.0.1"
-    local_port = 10087
-    QUICBase = QUICServerKnowledgeBase(configuration, ("127.0.0.1",10086), local_addr,local_port, handle, options=args)
+    local_ip, local_port = args.local_addr.split(':')
+    local_port = int(local_port)
+    # local_ip = "127.0.0.1"
+    # local_port = args.local_port
+    dst_ip_add_str, dst_port_str = args.remote_addr.split(':')
+    dst_port_int = int(dst_port_str)
+    dst_addr = (dst_ip_add_str, dst_port_int)
+    QUICBase = QUICServerKnowledgeBase(configuration, dst_addr, local_ip, local_port, handle, options=args)
 
     logging.getLogger("WpMethodEQ").setLevel(logging.DEBUG)
     logging.getLogger("RandomWalkMethod").setLevel(logging.DEBUG)
@@ -355,7 +341,7 @@ def main():
     finally:
         # TLSBase.stop()
         QUICBase.stop()
-    automaton = convert_from_pylstar(scenario.input_vocabulary, state_machine)
+    automaton = convert_from_pylstar([Letter(s) for s in scenario.input_vocabulary], state_machine)
     with open(f"{args.output_dir}/final.automaton", "w", encoding="utf-8") as fd:
         fd.write(f"{automaton}\n")
 

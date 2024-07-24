@@ -70,8 +70,7 @@ def parse_args(client_inference):
         help="address of the trigger (default is None)",
     )
 
-    if client_inference:
-        parser.add_argument(
+    parser.add_argument(
             "-L",
             "--local-endpoint",
             action="store",
@@ -79,9 +78,8 @@ def parse_args(client_inference):
             dest="local_endpoint_str",
             default="127.0.0.1:4433",
             help="address used to accept connections (default is 127.0.0.1:4433)",
-        )
-    else:
-        parser.add_argument(
+    )
+    parser.add_argument(
             "-R",
             "--remote-endpoint",
             action="store",
@@ -89,7 +87,7 @@ def parse_args(client_inference):
             dest="remote_endpoint_str",
             default="127.0.0.1:4433",
             help="address to connect to (default is 127.0.0.1:4433)",
-        )
+    )
 
     parser.add_argument(
         "-C",
@@ -173,6 +171,24 @@ def parse_args(client_inference):
     )
 
     parser.add_argument(
+        '--cert',
+        action='store',
+        type=str,
+        dest='cert',
+        default=None,
+        help='Certificate file'
+    )
+
+    parser.add_argument(
+        '--port',
+        action='store',
+        type=int,
+        dest='local_port',
+        default=2000,
+        help='Port to listen start'
+    )
+
+    parser.add_argument(
         "messages", metavar="messages", nargs="*", help="Sequence of messages to send"
     )
 
@@ -184,8 +200,11 @@ def parse_args(client_inference):
     result.loops = args.loops
     result.messages = args.messages
     result.timeout = args.timeout
+    result.cert = args.cert
+    result.local_port = args.local_port
     result.expected_minimal_timeout = args.expected_minimal_timeout
-
+    result.remote_addr = args.remote_endpoint_str
+    result.local_addr = args.local_endpoint_str
     result.trigger_endpoint = None
     # if args.trigger_endpoint_str:
     #     result.trigger_endpoint = handle_endpoint(parser, args.trigger_endpoint_str)

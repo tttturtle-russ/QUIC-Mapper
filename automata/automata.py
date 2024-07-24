@@ -109,6 +109,7 @@ class Automaton:
                     self.states[input_state][word] = transition_content
 
     def follow_transition(self, state: int, msg: str):
+        _msg = None
         if isinstance(msg, Letter):
             for symbol in msg.symbols:
                 _msg = symbol
