@@ -33,6 +33,7 @@ import json
 from pylstar.tools.Decorators import PylstarLogger
 from pylstar.Word import Word
 from pylstar.Letter import Letter
+from pylstar.Exception import PathIncompleteException
 
 
 @PylstarLogger
@@ -91,7 +92,7 @@ class KnowledgeNode(object):
             child = self.children[current_input_letter]
             
             if current_output_letter is not None and child.output_letter != current_output_letter:
-                raise Exception("Incompatible path found, expected '{}' found '{}'".format(child.output_letter.symbols, current_output_letter.symbols))
+                raise PathIncompleteException("Incompatible path found, expected '{}' found '{}'".format(child.output_letter.symbols, current_output_letter.symbols))
 
             if output_letters is None:
                 new_output_letters = None
@@ -295,7 +296,7 @@ class KnowledgeTree(object):
         for root in self.roots:
             if root.input_letter == input_letters[0]:
                 if root.output_letter != output_letters[0]:
-                    raise Exception("Incompatible path found, expected '{}' found '{}'".format(root.output_letter.symbols, output_letters[0].symbols))
+                    raise PathIncompleteException("Incompatible path found, expected '{}' found '{}'".format(root.output_letter.symbols, output_letters[0].symbols))
                 retained_root = root
                 break
 

@@ -99,7 +99,7 @@ class KnowledgeBase(object):
         """
         if query is None:
             raise Exception("Query cannot be None")
-
+        
         query.output_word = self._resolve_word(query.input_word)
 
     def _resolve_word(self, word):

@@ -40,7 +40,7 @@ class QUICClientProtocol:
         for datagram in self.handle.send_handshake_packet():
             self.transmit(datagram, addr)
 
-    def datagram_received(self, timeout=1) -> Optional[str]:
+    def datagram_received(self, timeout=0.1) -> Optional[str]:
         readable, writeable, errored = select.select([self.sock], [], [],timeout)
         if self.sock not in readable:
             return None
@@ -102,7 +102,7 @@ class QUICClientProtocol:
         self.handle.reset(self.dst_addr)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.port += 1
-        self.port = (self.port - self.origin_port) % 100 + self.origin_port
+        self.port = (self.port - self.origin_port) % 500 + self.origin_port
         self.local_addr = (self.local, self.port)
         self.sock.bind(self.local_addr)
 

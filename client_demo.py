@@ -51,7 +51,7 @@ def _get_datagrams(file_path):
 
 def main():
     # loop = asyncio.get_running_loop()
-    dst_addr = ("172.17.0.6", 4433)
+    dst_addr = ("127.0.0.1", 10087)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=None) # CA certificate can be changed
@@ -60,14 +60,14 @@ def main():
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = '172.17.0.1'
+    local_addr = '127.0.0.1'
     local_port = 20000
     # transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
     protocol = QUICClientProtocol(dst_addr, local_addr, handle, local_port=local_port)
 
     def receive():
-        msg = protocol.datagram_received()
+        msg = protocol.datagram_received(timeout=0.5)
 
         if msg is None:
             # print('no data')
@@ -107,13 +107,22 @@ def main():
         # protocol.connect()
         # re()
 
-        protocol.connect()
-        re()
+        # protocol.connect()
+        # re()
 
         protocol.handshake_packet()
         re()
 
         protocol.path_challenge()
+        re()
+
+        protocol.initial_ack_packet()
+        re()
+
+        protocol.path_challenge()
+        re()
+
+        protocol.initial_ack_packet()
         re()
         # time_now = time.time()
         # while 1:

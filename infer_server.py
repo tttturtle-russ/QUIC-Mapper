@@ -126,27 +126,24 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         if not response:
             return 'TIMEOUT'
 
-
+        start_time = time.time()
         while expected_output != '+'.join(response) or expected_output is None:
             next_msg = self.receive()
-            if not next_msg:
+            # if not next_msg:
+            #     break
+            if next_msg:
+                response += '+' + next_msg
+            time_now = time.time()
+            if time_now - start_time > 1.0:
                 break
-            # if next_msg == self.pre_msg:
-            #     continue
-            self.pre_msg = next_msg
-            response += '+' + next_msg
+            # self.pre_msg = next_msg
+
 
         if not response:
-            end = time.time()
-            timeout = end - start
-            self.timeout_real = max(self.timeout_set, timeout*4)
             return 'TIMEOUT'
 
         # print("+".join(response))
         print('response:', response)
-        end = time.time()
-        timeout = end - start
-        self.timeout_real = max(self.timeout_set, timeout*4)
         # return "+".join(response)
         return response
 
@@ -167,9 +164,9 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         msg = self.tool.protocol.datagram_received(timeout=self.timeout_set)
 
         if msg is None:
-            print('no data')
+            # print('no data')
             return None
-        print('data yes')
+        # print('data yes')
         if 'CC' in msg:
             self.CC = True
 
@@ -200,21 +197,18 @@ def main():
             encoding="utf-8",
     ) as scenario_file:
         scenario = config.scenarios.load_scenario(scenario_file)
-    # cert_name = args.cert
-    # cert_name = 'server.crt'
-    # SERVER_CACERTFILE = os.path.join(os.getcwd(), "vertify", cert_name)
+
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=None)  # CA certificate can be changed
     configuration.verify_mode = ssl.CERT_NONE  # important for client disable CA verification
-    # quic_logger = QuicFileLogger(os.getcwd())
+
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     local_ip, local_port = args.local_addr.split(':')
     local_port = int(local_port)
-    # local_ip = "127.0.0.1"
-    # local_port = args.local_port
+
     dst_ip_add_str, dst_port_str = args.remote_addr.split(':')
     dst_port_int = int(dst_port_str)
     dst_addr = (dst_ip_add_str, dst_port_int)
