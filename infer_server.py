@@ -104,8 +104,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         return Word(letters=output_letters)
 
     def send_and_receive(self, expected_output, symbols):
-        start = time.time()
-        print('expected_output:', expected_output)
+        # start = time.time()
+        # print('expected_output:', expected_output)
         if self.CC is True:
             return "CC"
         try:
@@ -143,7 +143,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return 'TIMEOUT'
 
         # print("+".join(response))
-        print('response:', response)
+        # print('response:', response)
         # return "+".join(response)
         return response
 
@@ -192,7 +192,7 @@ def main():
 
     # dirname = os.path.dirname(sys.argv[1])
     with open(
-            f"./scenarios/test.scenario.old",
+            f"./scenarios/test.scenario",
             "r",
             encoding="utf-8",
     ) as scenario_file:

@@ -32,6 +32,7 @@ import abc
 from pylstar.tools.Decorators import PylstarLogger
 from pylstar.KnowledgeTree import KnowledgeTree
 from pylstar.KnowledgeBaseStats import KnowledgeBaseStats
+from pylstar.Exception import PathIncompleteException
 
 
 @PylstarLogger
@@ -99,8 +100,18 @@ class KnowledgeBase(object):
         """
         if query is None:
             raise Exception("Query cannot be None")
-        
-        query.output_word = self._resolve_word(query.input_word)
+
+        # 抛出异常表示路径学习冲突 重试
+        retries = 0
+        success = False
+
+        while retries < 3 and not success:
+            try:
+                query.output_word = self._resolve_word(query.input_word)
+                success = True  # 如果__add_letters执行成功，设置success为True以退出循环
+            except PathIncompleteException as e:
+                retries += 1  # 递增重试次数
+                print(f"Attempt {retries}: Failed to add letters due to {e}. Retrying...")
 
     def _resolve_word(self, word):
         if word is None:
