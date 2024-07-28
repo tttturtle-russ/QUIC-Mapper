@@ -40,6 +40,7 @@ class QUICClientInferTool:
         }
         for symbol in symbols:
             if isinstance(symbol, Letter):
+                print(symbol)
                 for symbol in symbol.symbols:
                     func = func_map.get(symbol, None)
                     if func is None:

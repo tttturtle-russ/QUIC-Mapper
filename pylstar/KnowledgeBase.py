@@ -105,7 +105,7 @@ class KnowledgeBase(object):
         retries = 0
         success = False
 
-        while retries < 3 and not success:
+        while retries < 5 and not success:
             try:
                 query.output_word = self._resolve_word(query.input_word)
                 success = True  # 如果__add_letters执行成功，设置success为True以退出循环

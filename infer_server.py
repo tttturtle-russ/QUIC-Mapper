@@ -40,7 +40,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.options = options
         self.learned = False
         self.CC = False
-        self.timeout_set = options.timeout
+        self.timeout_set = 0
         self.timeout_real = self.timeout_set
         self.pre_msg = None
 
@@ -192,7 +192,7 @@ def main():
 
     # dirname = os.path.dirname(sys.argv[1])
     with open(
-            f"./scenarios/test.scenario",
+            f"./scenarios/test.scenario.old",
             "r",
             encoding="utf-8",
     ) as scenario_file:

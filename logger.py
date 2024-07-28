@@ -341,7 +341,7 @@ class QuicFileLogger(QuicLogger):
         #     self.path, dcid + '_' + str(datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + ".qlog"
         # )
 
-        trace_filename = f"{dcid}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.qlog"
+        trace_filename = f"{dcid}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.json"
         trace_path = os.path.join(log_folder, trace_filename)
 
         with open(trace_path, "w") as logger_fp:

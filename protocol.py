@@ -98,11 +98,11 @@ class QUICClientProtocol:
         # self.handle.end_trace()
 
     def reset(self):
-        self.handle.end_trace()
+        # self.handle.end_trace()
         self.handle.reset(self.dst_addr)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.port += 1
-        self.port = (self.port - self.origin_port) % 500 + self.origin_port
+        self.port = (self.port - self.origin_port) % 1000 + self.origin_port
         self.local_addr = (self.local, self.port)
         self.sock.bind(self.local_addr)
 
