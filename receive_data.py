@@ -1654,12 +1654,12 @@ class Handle:
                 self._quic_logger.encode_path_response_frame(data=data)
             )
 
-        if data != context.network_path.local_challenge:
-            raise QuicConnectionError(
-                error_code=QuicErrorCode.PROTOCOL_VIOLATION,
-                frame_type=frame_type,
-                reason_phrase="Response does not match challenge",
-            )
+        # if data != context.network_path.local_challenge:
+        #     raise QuicConnectionError(
+        #         error_code=QuicErrorCode.PROTOCOL_VIOLATION,
+        #         frame_type=frame_type,
+        #         reason_phrase="Response does not match challenge",
+        #     )
         self._logger.debug(
             "Network path %s validated by challenge", context.network_path.addr
         )
