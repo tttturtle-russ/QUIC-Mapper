@@ -1660,10 +1660,10 @@ class Handle:
         #         frame_type=frame_type,
         #         reason_phrase="Response does not match challenge",
         #     )
-        self._logger.debug(
-            "Network path %s validated by challenge", context.network_path.addr
-        )
-        context.network_path.is_validated = True
+        # self._logger.debug(
+        #     "Network path %s validated by challenge", context.network_path.addr
+        # )
+        # context.network_path.is_validated = True
 
     def _handle_ping_frame(
             self, context: QuicReceiveContext, frame_type: int, buf: Buffer
