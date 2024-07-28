@@ -108,6 +108,8 @@ class KnowledgeBase(object):
         while retries < 5 and not success:
             try:
                 query.output_word = self._resolve_word(query.input_word)
+                print(f"Input word: {query.input_word}")
+                print(f"Output word: {query.output_word}")
                 success = True  # 如果__add_letters执行成功，设置success为True以退出循环
             except PathIncompleteException as e:
                 retries += 1  # 递增重试次数

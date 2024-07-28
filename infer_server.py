@@ -40,7 +40,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.options = options
         self.learned = False
         self.CC = False
-        self.timeout_set = 0
+        self.timeout_set = options.timeout
         self.timeout_real = self.timeout_set
         self.pre_msg = None
 
@@ -134,7 +134,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             if next_msg:
                 response += '+' + next_msg
             time_now = time.time()
-            if time_now - start_time > 1.0:
+            if time_now - start_time > self.timeout_set:
                 break
             # self.pre_msg = next_msg
 
