@@ -938,7 +938,14 @@ class Handle:
                 if is_ack_eliciting and space.ack_at is None:
                     space.ack_at = now + self._ack_delay
 
-            tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
+            if self._handshake_confirmed:
+                non_ack_frames = [frame['frame_type'] for frame in quic_logger_frames if frame['frame_type'] != 'ack']
+                if non_ack_frames:
+                    tmp = log_packet + '_' + ':'.join(non_ack_frames)
+                else:
+                    tmp = ''
+            else:
+                tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
             # if 'ping' not in tmp:
             tmp = tmp.replace('1RTT_ping:padding', '')
             tmp = tmp.replace('initial_ping:padding', '')

@@ -131,7 +131,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             next_msg = self.receive()
             # if not next_msg:
             #     break
-            if next_msg:
+            if next_msg and next_msg != '':
                 response += '+' + next_msg
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
