@@ -139,8 +139,8 @@ def parse_args(client_inference):
         action="store",
         type=str,
         dest="output_dir",
-        default="/tmp/tls-inferer",
-        help="output directory where to write the state machines (default is /tmp/tls-inferer)",
+        default="/tmp/quic-inferer",
+        help="output directory where to write the state machines (default is /tmp/quic-infer)",
     )
     parser.add_argument(
         "-v",

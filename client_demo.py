@@ -93,9 +93,9 @@ def main():
         time_now = time.time()
         # re()
 
-        protocol.connect()
+        # protocol.connect()
         # time_now = time.time()
-        re()
+        # re()
 
         protocol.connect()
         # time_now = time.time()
@@ -104,8 +104,36 @@ def main():
         protocol.handshake_packet()
         re()
 
-        protocol.new_connection_id()
+        protocol.connect()
         re()
+
+        protocol.path_challenge()
+        re()
+
+        protocol.handshake_packet()
+        re()
+
+        protocol.path_challenge()
+        re()
+
+        protocol.initial_close()
+        re()
+
+        protocol.handshake_close()
+        re()
+
+        protocol.path_challenge()
+        re()
+
+        protocol.connect()
+        re()
+
+        protocol.path_challenge()
+        re()
+
+
+        # protocol.initial_ack_packet()
+        # re()
 
         # protocol.connect()
         # re()
@@ -113,11 +141,11 @@ def main():
         # protocol.handshake_packet()
         # re()
 
-        protocol.path_challenge()
-        re()
+        # protocol.path_challenge()
+        # re()
 
-        protocol.connect()
-        re()
+        # protocol.connect()
+        # re()
 
         # protocol.path_challenge()
         # re()

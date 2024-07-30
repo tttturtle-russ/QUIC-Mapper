@@ -588,6 +588,7 @@ class Handle:
         #     self._close_at = now + self._idle_timeout()
         log = []
         buf = Buffer(data=data)
+        ping = False
         while not buf.eof():
             start_off = buf.tell()
             try:
@@ -947,13 +948,15 @@ class Handle:
             else:
                 tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
             # if 'ping' not in tmp:
+            if tmp == '1RTT_ping:padding' or tmp == 'initial_ping:padding' or tmp == 'handshake_ping:padding':
+                ping = True
             tmp = tmp.replace('1RTT_ping:padding', '')
             tmp = tmp.replace('initial_ping:padding', '')
             tmp = tmp.replace('handshake_ping:padding', '')
             if tmp != '':
                 log.append(tmp)
-
-        filtered_strings = [s for s in log if s != ""]
+        if ping is True and log == []:
+            return 'ping'
         return "+".join(log)
 
     def _payload_received(

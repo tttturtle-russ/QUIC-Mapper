@@ -451,6 +451,39 @@ def convert_from_pylstar(
 
     return automaton.reorder_states()
 
+def convert_from_pylstar_to_dot(
+    input_vocabulary: List[str],
+    pylstar_automaton: pylstar.automata.Automata.Automata
+) -> str:
+    # 开始构造DOT字符串
+    dot_content = 'digraph "Automata" {\n'
+
+    # 定义默认的状态和转换属性
+    dot_content += '  node [style=filled, fillcolor=white];\n'
+
+    # 遍历pylstar自动机中的所有状态，并决定每个状态的形状
+    state_shapes = {}
+    for state in pylstar_automaton.get_states():
+        # 假设状态名为"0"是初始状态，其余为常规状态
+        shape = "doubleoctagon" if state.name == "0" else "ellipse"
+        state_shapes[state.name] = shape
+        dot_content += f'  "{state.name}" [shape={shape}, URL="{state.name}"];\n'
+
+    # 遍历所有状态的所有转换
+    for input_state in pylstar_automaton.get_states():
+        for transition in input_state.transitions:
+            input_word, output_words = transition.label.split("/")
+            input_word = input_word.strip().strip("'")
+            output_words = [m.strip() for m in output_words.split("+") if m.strip()]
+            output_words_str = ":".join(output_words)  # 使用冒号分隔输出字
+            label = f"{input_word} / {output_words_str}"
+            dot_content += f'  "{input_state.name}" -> "{transition.output_state.name}" [fontsize=5, label="{label}", URL="{transition.name}"];\n'
+
+    dot_content += '}\n'  # 结束图的定义
+    return dot_content
+
+
+
 
 def load_automaton(content: str) -> Automaton:
     lines = content.split("\n")

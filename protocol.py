@@ -40,7 +40,7 @@ class QUICClientProtocol:
         for datagram in self.handle.send_handshake_packet():
             self.transmit(datagram, addr)
 
-    def datagram_received(self, timeout=0.1) -> Optional[str]:
+    def datagram_received(self, timeout=0.2) -> Optional[str]:
         readable, writeable, errored = select.select([self.sock], [], [],timeout)
         if self.sock not in readable:
             return None

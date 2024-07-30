@@ -25,7 +25,7 @@ from utils import (
 from HappyPathFirst import HappyPathFirst
 from StoreHypotheses import StoreHypotheses
 # from stubs.client_concretization import InfererTools
-from automata.automata import convert_from_pylstar
+from automata.automata import convert_from_pylstar, convert_from_pylstar_to_dot
 from logger import QuicFileLogger , QuicLogger
 from stubs.client_concretization import QUICClientInferTool
 
@@ -122,24 +122,49 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                 print(e)
                 return "INTERNAL ERROR DURING EMISSION"
 
+        if expected_output is not None and expected_output == "TIMEOUT":
+            return "TIMEOUT"
+
         response = self.receive()
         if not response:
             return 'TIMEOUT'
 
+        if response == 'ping':
+            print('ping')
+            response = ''
+
         start_time = time.time()
-        while expected_output != '+'.join(response) or expected_output is None:
+        while expected_output != response or expected_output is None:
+
             next_msg = self.receive()
             # if not next_msg:
             #     break
-            if next_msg and next_msg != '':
-                response += '+' + next_msg
+            if next_msg == 'ping':
+                print('ping')
+                next_msg = self.receive()
+            if next_msg and next_msg != '' and next_msg != 'ping':
+                if response != '':
+                    response += '+' + next_msg
+                else:
+                    response = next_msg
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
+                next_msg = self.receive()
+                # if not next_msg:
+                #     break\
+                if next_msg == 'ping':
+                    print('ping')
+                    next_msg = self.receive()
+                if next_msg and next_msg != '' and next_msg != 'ping':
+                    if response != '':
+                        response += '+' + next_msg
+                    else:
+                        response = next_msg
                 break
             # self.pre_msg = next_msg
 
 
-        if not response:
+        if not response or response == '':
             return 'TIMEOUT'
 
         # print("+".join(response))
@@ -340,6 +365,9 @@ def main():
     automaton = convert_from_pylstar([Letter(s) for s in scenario.input_vocabulary], state_machine)
     with open(f"{args.output_dir}/final.automaton", "w", encoding="utf-8") as fd:
         fd.write(f"{automaton}\n")
+    dot = convert_from_pylstar_to_dot([Letter(s) for s in scenario.input_vocabulary], state_machine)
+    with open(f"{args.output_dir}/final.dot", "w", encoding="utf-8") as fd:
+        fd.write(f"{dot}\n")
 
     log(f"n_queries={QUICBase.stats.nb_query}\n")
     log(f"n_submitted_queries={QUICBase.stats.nb_submited_query}\n")
