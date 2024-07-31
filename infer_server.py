@@ -182,6 +182,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # self.tool = QUICClientInferTool(self.configuration, self.dst_addr, self.local_addr, handle)
         self.tool.reset()
         self.CC = False
+        self.handshake_done = False
         print('-' * 20)
         print('-'*10 + ' reset '+'-'*10)
 
