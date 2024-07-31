@@ -51,7 +51,7 @@ def _get_datagrams(file_path):
 
 def main():
     # loop = asyncio.get_running_loop()
-    dst_addr = ("127.0.0.1", 10087)
+    dst_addr = ("172.17.0.2", 4433)
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=None) # CA certificate can be changed
@@ -60,7 +60,7 @@ def main():
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = '127.0.0.1'
+    local_addr = '172.17.0.1'
     local_port = 50000
     # transport, protocol = await start_quic_client(addr, local_addr, handle)
     # above is necessary
@@ -101,35 +101,47 @@ def main():
         # time_now = time.time()
         re()
 
-        protocol.handshake_packet()
+        protocol.initial_ack_packet()
         re()
 
-        protocol.connect()
+        protocol.initial_ack_packet()
         re()
 
-        protocol.path_challenge()
-        re()
-
-        protocol.handshake_packet()
-        re()
-
-        protocol.path_challenge()
+        protocol.initial_ack_packet()
         re()
 
         protocol.initial_close()
         re()
 
-        protocol.handshake_close()
-        re()
+        # protocol.handshake_packet()
+        # re()
 
-        protocol.path_challenge()
-        re()
+        # protocol.connect()
+        # re()
 
-        protocol.connect()
-        re()
+        # protocol.path_challenge()
+        # re()
 
-        protocol.path_challenge()
-        re()
+        # protocol.handshake_packet()
+        # re()
+
+        # protocol.path_challenge()
+        # re()
+
+        # protocol.initial_close()
+        # re()
+
+        # protocol.handshake_close()
+        # re()
+
+        # protocol.path_challenge()
+        # re()
+
+        # protocol.connect()
+        # re()
+
+        # protocol.path_challenge()
+        # re()
 
 
         # protocol.initial_ack_packet()
