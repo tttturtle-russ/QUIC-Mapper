@@ -2562,7 +2562,7 @@ class Handle:
         space = self._spaces[tls.Epoch.INITIAL]
 
         builder.start_packet(PACKET_TYPE_INITIAL, self._cryptos[tls.Epoch.INITIAL])
-        self._write_ack_frame(builder, space)
+        # self._write_ack_frame(builder, space)
         self._write_connection_close_frame(builder, tls.Epoch.INITIAL, 0, None, "")
         datagrams, packets = builder.flush()
         if len(datagrams) == 0:
@@ -2583,7 +2583,7 @@ class Handle:
         )
         space = self._spaces[tls.Epoch.HANDSHAKE]
         builder.start_packet(PACKET_TYPE_HANDSHAKE, self._cryptos[tls.Epoch.HANDSHAKE])
-        self._write_ack_frame(builder, space)
+        # self._write_ack_frame(builder, space)
         self._write_connection_close_frame(builder, tls.Epoch.HANDSHAKE, 0, None, "")
         datagrams, packets = builder.flush()
         if len(datagrams) == 0:
@@ -2604,7 +2604,7 @@ class Handle:
             return self._get_datagrams("bin/onertt_close.bin")
         space = self._spaces[tls.Epoch.ONE_RTT]
         builder.start_packet(PACKET_TYPE_ONE_RTT, self._cryptos[tls.Epoch.ONE_RTT])
-        self._write_ack_frame(builder, space)
+        # self._write_ack_frame(builder, space)
         self._write_connection_close_frame(builder, tls.Epoch.ONE_RTT, 0, None, "")
         datagrams, packets = builder.flush()
         if len(datagrams) == 0:
