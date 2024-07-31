@@ -133,7 +133,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             return 'TIMEOUT'
 
         if response == 'ping':
-            print('ping')
+            # print('ping')
             response = ''
 
         start_time = time.time()
@@ -143,7 +143,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             # if not next_msg:
             #     break
             if next_msg == 'ping':
-                print('ping')
+                # print('ping')
                 next_msg = self.receive()
             if next_msg and next_msg != '' and next_msg != 'ping':
                 if response != '':
@@ -156,7 +156,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                 # if not next_msg:
                 #     break\
                 if next_msg == 'ping':
-                    print('ping')
+                    # print('ping')
                     next_msg = self.receive()
                 if next_msg and next_msg != '' and next_msg != 'ping':
                     if response != '':
