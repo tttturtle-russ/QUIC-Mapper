@@ -43,6 +43,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         self.timeout_set = options.timeout
         self.timeout_real = self.timeout_set
         self.pre_msg = None
+        self.handshake_done = False
 
     def start(self):
         pass
@@ -108,6 +109,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # print('expected_output:', expected_output)
         if self.CC is True:
             return "CC"
+        if self.handshake_done is True:
+            return 'Done'
         try:
             self.tool.concretize_client_messages(symbols)
         except BrokenPipeError:
@@ -170,6 +173,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # print("+".join(response))
         # print('response:', response)
         # return "+".join(response)
+        if 'handshake_done' in response:
+            self.handshake_done = True
         return response
 
     def reset(self):

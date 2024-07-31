@@ -92,10 +92,10 @@ class KnowledgeNode(object):
             child = self.children[current_input_letter]
             
             if current_output_letter is not None and child.output_letter != current_output_letter:
-                if current_output_letter != Letter('TIMEOUT'):
-                    raise PathIncompleteException("Incompatible path found, expected '{}' found '{}'".format(child.output_letter.symbols, current_output_letter.symbols))
-                else:
-                    current_output_letter = child.output_letter
+                # if current_output_letter != Letter('TIMEOUT'):
+                raise PathIncompleteException("Incompatible path found, expected '{}' found '{}'".format(child.output_letter.symbols, current_output_letter.symbols))
+                # else:
+                #     current_output_letter = child.output_letter
 
             if output_letters is None:
                 new_output_letters = None
