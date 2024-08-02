@@ -330,7 +330,7 @@ class Handle:
         # self._peer_token = configuration.token
         self._quic_logger = configuration.quic_logger.start_trace()
         self._remote_ack_delay_exponent = 3
-        # self._remote_active_connection_id_limit = 2
+        self._remote_active_connection_id_limit = 2
         self._remote_initial_source_connection_id: Optional[bytes] = None
         # self._remote_max_idle_timeout: Optional[float] = None  # seconds
         # self._remote_max_data = 0

@@ -116,7 +116,7 @@ def parse_args(client_inference):
         help="always wait a minimal timeout even with the expected optimization (default is 0)",
     )
 
-    def_eq_test = "BDist:3"
+    def_eq_test = "WP:7"
     parser.add_argument(
         "-E",
         "--eq-method",
@@ -139,7 +139,7 @@ def parse_args(client_inference):
         action="store",
         type=str,
         dest="output_dir",
-        default="/tmp/quic-inferer",
+        default="/tmp/quic-infer",
         help="output directory where to write the state machines (default is /tmp/quic-infer)",
     )
     parser.add_argument(

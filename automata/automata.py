@@ -56,7 +56,7 @@ class Automaton:
         vocabulary.sort()
         result = [" ".join(vocabulary)]
         for state in sorted(self.states):
-            print(type(self.states[state]))
+            # print(type(self.states[state]))
             for input_word in (self.states[state]):
                 output_state, output_words, _ = self.states[state][input_word]
                 output_words_s = "+".join(output_words)
