@@ -59,7 +59,7 @@ def main():
     # configuration.alpn_protocols = ["echo"]s
     quic_logger = QuicFileLogger(os.getcwd())
     configuration.quic_logger = quic_logger
-    configuration.alpn_protocols = ["hq-29"]  # Application Layer Protocol Negotiation
+    configuration.alpn_protocols = ["hq-28"]  # Application Layer Protocol Negotiation
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
     local_addr = '172.17.0.1'
