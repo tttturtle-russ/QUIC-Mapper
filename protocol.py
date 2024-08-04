@@ -93,6 +93,15 @@ class QUICClientProtocol:
         for data in self.handle.send_new_connectionid():
             self.transmit(data, self.dst_addr)
 
+    def path_migrate(self):
+        self.sock.close()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.port += 1
+        self.port = (self.port - self.origin_port) % 1000 + self.origin_port
+        self.local_addr = (self.local, self.port)
+        self.sock.bind(self.local_addr)
+        self.path_challenge()
+
     def end_trace(self):
         self.handle.end_trace_file()
         # self.handle.end_trace()

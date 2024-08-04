@@ -2508,7 +2508,9 @@ class Handle:
 
     def send_path_challenge(self):
         if not self._handshake_complete:
+            # print('handshake not complete')
             return self._get_datagrams("bin/path_challenge.bin")
+        # print('handshake complete')
         builder = self.send_1rtt_packet()
         # space = self._spaces[tls.Epoch.ONE_RTT]
         # self._write_ack_frame(builder, space)

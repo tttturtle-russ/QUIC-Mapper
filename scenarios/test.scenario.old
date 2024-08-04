@@ -2,4 +2,4 @@
 name=test
 role=client
 
-input_vocabulary = ConnectInitial, HandshakeInitial, Handshake, PathChallenge, PathResponse, InitialClose, HandshakeClose, OneRTTClose, NewConnectionID
+input_vocabulary = ConnectInitial, HandshakeInitial, Handshake, PathChallenge, PathMigra, PathResponse, InitialClose, HandshakeClose, OneRTTClose, NewConnectionID

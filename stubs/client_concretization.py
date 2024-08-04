@@ -32,6 +32,7 @@ class QUICClientInferTool:
             "HandshakeInitial": self.protocol.initial_ack_packet,
             "Handshake": self.protocol.handshake_packet,
             "PathChallenge": self.protocol.path_challenge,
+            "PathMigra": self.protocol.path_migrate,
             "PathResponse": self.protocol.path_response,
             "InitialClose": self.protocol.initial_close,
             "HandshakeClose": self.protocol.handshake_close,
