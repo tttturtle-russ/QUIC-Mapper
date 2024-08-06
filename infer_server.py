@@ -138,7 +138,6 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
         start_time = time.time()
         while expected_output != response or expected_output is None:
-
             next_msg = self.receive()
             # if not next_msg:
             #     break
@@ -237,6 +236,7 @@ def main():
     quic_logger = QuicLogger()
     configuration.quic_logger = quic_logger
     handle = Handle(configuration=configuration)
+    configuration.alpn_protocols = ['h3']
     local_ip, local_port = args.local_addr.split(':')
     local_port = int(local_port)
 
