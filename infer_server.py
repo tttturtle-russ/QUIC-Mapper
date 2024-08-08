@@ -167,7 +167,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
 
         if not response or response == '':
-            return 'TIMEOUT2'
+            return 'TIMEOUT'
 
         # print("+".join(response))
         # print('response:', response)
