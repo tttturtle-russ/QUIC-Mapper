@@ -151,7 +151,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                     response = next_msg
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
-                next_msg = self.receive()
+                # next_msg = self.receive()
                 # # if not next_msg:
                 # #     break\
                 # if next_msg == 'ping':

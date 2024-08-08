@@ -973,6 +973,8 @@ class Handle:
                 tmp = tmp.replace('initial_ping', '')
                 tmp = tmp.replace('handshake_ping', '')
             if 'initial' in tmp and 'crypto' in tmp:
+                if 'padding' not in tmp:
+                    self._handshake_crypto = True
                 if self._initial_crypto is False:
                     self._initial_crypto = True
                 else:

@@ -464,20 +464,23 @@ def convert_from_pylstar_to_dot(
     # 遍历pylstar自动机中的所有状态，并决定每个状态的形状
     state_shapes = {}
     for state in pylstar_automaton.get_states():
-        # 假设状态名为"0"是初始状态，其余为常规状态
+        # 修改状态名为 s0, s1, s2, ...
+        state_name = f's{state.name}'  # 假设state.name是从0开始的整数
         shape = "doubleoctagon" if state.name == "0" else "ellipse"
-        state_shapes[state.name] = shape
-        dot_content += f'  "{state.name}" [shape={shape}, URL="{state.name}"];\n'
+        state_shapes[state_name] = shape
+        dot_content += f'  "{state_name}" [shape={shape}, URL="{state_name}"];\n'
 
     # 遍历所有状态的所有转换
     for input_state in pylstar_automaton.get_states():
+        state_name = f's{input_state.name}'
         for transition in input_state.transitions:
+            target_state_name = f's{transition.output_state.name}'
             input_word, output_words = transition.label.split("/")
             input_word = input_word.strip().strip("'")
             output_words = [m.strip() for m in output_words.split("+") if m.strip()]
             output_words_str = ":".join(output_words)  # 使用冒号分隔输出字
             label = f"{input_word} / {output_words_str}"
-            dot_content += f'  "{input_state.name}" -> "{transition.output_state.name}" [fontsize=5, label="{label}", URL="{transition.name}"];\n'
+            dot_content += f'  "{state_name}" -> "{target_state_name}" [fontsize=5, label="{label}", URL="{transition.name}"];\n'
 
     dot_content += '}\n'  # 结束图的定义
     return dot_content

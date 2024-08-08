@@ -23,7 +23,7 @@ def _get_datagrams(file_path):
 def main():
     # loop = asyncio.get_running_loop()
     # ip_address = socket.gethostbyname("http3-test.litespeedtech.com")
-    dst_addr = ("172.17.0.4", 4433) # server address
+    dst_addr = ("fb.mvfst.net", 443) # server address
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=None) # CA certificate can be changed
@@ -33,12 +33,12 @@ def main():
     configuration.alpn_protocols = H3_ALPN  # Application Layer Protocol Negotiation
     handle = Handle(configuration=configuration)
     # 创建一个 UDP 端点
-    local_addr = '172.17.0.1'
+    local_addr = '0.0.0.0'
     local_port = 40000
     protocol = QUICClientProtocol(dst_addr, local_addr, handle, local_port=local_port)
 
     def receive():
-        msg = protocol.datagram_received(timeout=0.2)
+        msg = protocol.datagram_received(timeout=1.5)
 
         if msg is None:
             # print('no data')
@@ -61,10 +61,13 @@ def main():
         print('='*20 + 'reset' + '='*20)
         protocol.reset()
 
+        # protocol.initial_close()
+        # re()
+
         protocol.connect()
         re()
-        protocol.initial_ack_packet()
-        re()
+        # protocol.initial_ack_packet()
+        # re()
         while 1:
             re()
         protocol.initial_ack_packet()
