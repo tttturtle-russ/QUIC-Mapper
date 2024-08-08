@@ -981,7 +981,7 @@ class Handle:
                     ping = True
                     self._handshake_crypto = True
                     continue
-            if 'handshake' in tmp and 'crypto' in tmp:
+            if 'handshake_' in tmp and 'crypto' in tmp:
                 if self._initial_ack_send is True:
                     ping = True
                     continue
@@ -1004,6 +1004,8 @@ class Handle:
                         continue
                 # elif self._1rtt_done_cb is True:
                 #     continue
+            tmp = tmp.replace(':ping', '')
+            tmp = tmp.replace('_ping','')
             if tmp != '':
                 log.append(tmp)
         if ping is True and log == []:
