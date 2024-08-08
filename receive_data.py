@@ -985,6 +985,7 @@ class Handle:
                 if self._initial_ack_send is True:
                     ping = True
                     continue
+                self._handshake_crypto = True
                 if self._handshake_crypto_cb is True:
                     ping = True
                     continue
@@ -1002,6 +1003,8 @@ class Handle:
                     else:
                         ping = True
                         continue
+                if 'stream' in tmp:
+                    continue
                 # elif self._1rtt_done_cb is True:
                 #     continue
             tmp = tmp.replace(':ping', '')
