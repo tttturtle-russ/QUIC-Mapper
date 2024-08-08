@@ -955,13 +955,17 @@ class Handle:
                     space.ack_at = now + self._ack_delay
 
             if self._handshake_confirmed:
-                non_ack_frames = [frame['frame_type'] for frame in quic_logger_frames if frame['frame_type'] != 'ack']
+                non_ack_frames = [frame['frame_type'] for frame in quic_logger_frames if frame['frame_type'] != 'ack' and frame['frame_type'] != 'stream']
                 if non_ack_frames:
                     tmp = log_packet + '_' + ':'.join(non_ack_frames)
                 else:
                     tmp = ''
             else:
-                tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
+                non_stream_frames = [frame['frame_type'] for frame in quic_logger_frames if frame['frame_type'] != 'stream']
+                if non_stream_frames:
+                    tmp = log_packet + '_' + ':'.join(non_stream_frames)
+                else:
+                    tmp = ''
             # if 'ping' not in tmp:
             if tmp == '1RTT_ping:padding' or tmp == 'initial_ping:padding' or tmp == 'handshake_ping:padding'\
                     or tmp == '1RTT_ping' or tmp == 'initial_ping' or tmp == 'handshake_ping':
@@ -1003,8 +1007,6 @@ class Handle:
                     else:
                         ping = True
                         continue
-                if 'stream' in tmp:
-                    continue
                 # elif self._1rtt_done_cb is True:
                 #     continue
             tmp = tmp.replace(':ping', '')

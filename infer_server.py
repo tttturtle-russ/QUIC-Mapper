@@ -137,7 +137,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         #     response = ''
         response = ''
         start_time = time.time()
-        while expected_output != response or expected_output is None:
+        while 1:
             next_msg = self.receive()
             # if not next_msg:
             #     break
@@ -152,8 +152,8 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
                 # next_msg = self.receive()
-                # # if not next_msg:
-                # #     break\
+                # if not next_msg:
+                #     break
                 # if next_msg == 'ping':
                 #     # print('ping')
                 #     next_msg = self.receive()
@@ -172,7 +172,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # print("+".join(response))
         # print('response:', response)
         # return "+".join(response)
-        if 'handshake_done' in response:
+        if 'handshakedone' in response:
             self.handshake_done = True
         return response
 
