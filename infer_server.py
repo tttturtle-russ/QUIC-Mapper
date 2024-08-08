@@ -174,6 +174,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
         # return "+".join(response)
         if 'handshakedone' in response:
             self.handshake_done = True
+        # print(type(response))
         return response
 
     def reset(self):
