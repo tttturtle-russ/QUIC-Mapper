@@ -1,0 +1,12 @@
+HandshakeInitial, ConnectInitial, PathChallenge, Handshake
+ConnectInitial, HandshakeInitial, Handshake
+ConnectInitial, PathChallenge, Handshake
+HandshakeInitial, ConnectInitial, Handshake
+ConnectInitial, Handshake
+HandshakeInitial, PathChallenge
+ConnectInitial, HandshakeClose
+ConnectInitial, InitialClose
+InitialClose
+NewConnectionID
+HandshakeClose
+PathChallenge
