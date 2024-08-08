@@ -106,7 +106,7 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
 
     def send_and_receive(self, expected_output, symbols):
         # start = time.time()
-        # print('expected_output:', expected_output)
+        print('expected_output:', expected_output)
         if self.CC is True:
             return "CC"
         if self.handshake_done is True:
@@ -125,17 +125,17 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                 print(e)
                 return "INTERNAL ERROR DURING EMISSION"
 
-        if expected_output is not None and expected_output == "TIMEOUT":
-            return "TIMEOUT"
+        if expected_output is not None and 'TIMEOUT' in expected_output:
+            return expected_output
 
-        response = self.receive()
-        if not response:
-            return 'TIMEOUT'
-
-        if response == 'ping':
-            # print('ping')
-            response = ''
-
+        # response = self.receive()
+        # if not response:
+        #     return 'TIMEOUT1'
+        #
+        # if response == 'ping':
+        #     # print('ping')
+        #     response = ''
+        response = ''
         start_time = time.time()
         while expected_output != response or expected_output is None:
             next_msg = self.receive()
@@ -152,22 +152,22 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
                 next_msg = self.receive()
-                # if not next_msg:
-                #     break\
-                if next_msg == 'ping':
-                    # print('ping')
-                    next_msg = self.receive()
-                if next_msg and next_msg != '' and next_msg != 'ping':
-                    if response != '':
-                        response += '+' + next_msg
-                    else:
-                        response = next_msg
+                # # if not next_msg:
+                # #     break\
+                # if next_msg == 'ping':
+                #     # print('ping')
+                #     next_msg = self.receive()
+                # if next_msg and next_msg != '' and next_msg != 'ping':
+                #     if response != '':
+                #         response += '+' + next_msg
+                #     else:
+                #         response = next_msg
                 break
             # self.pre_msg = next_msg
 
 
         if not response or response == '':
-            return 'TIMEOUT'
+            return 'TIMEOUT2'
 
         # print("+".join(response))
         # print('response:', response)

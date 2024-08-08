@@ -282,6 +282,17 @@ class Handle:
         self._handshake_complete = False
         self._handshake_confirmed = False
         self.handshake_confirmed = False
+        self._initial_crypto = False
+        self._initial_crypto_cb = False
+        self._handshake_crypto = False
+        self._handshake_crypto_cb = False
+        self._1rtt_done = False
+        self._1rtt_done_cb = False
+        self._initial_send = False
+        self._initial_ack_send = False
+        self._handshake_send = False
+        self._newid = False
+        self._newid_cb = False
         self._host_cids = [
             QuicConnectionId(
                 cid=os.urandom(configuration.connection_id_length),
@@ -589,6 +600,10 @@ class Handle:
         log = []
         buf = Buffer(data=data)
         ping = False
+        self._initial_crypto_cb = self._initial_crypto
+        self._handshake_crypto_cb = self._handshake_crypto
+        self._1rtt_done_cb = self._1rtt_done
+        self._newid_cb = self._newid
         while not buf.eof():
             start_off = buf.tell()
             try:
@@ -948,11 +963,45 @@ class Handle:
             else:
                 tmp = log_packet + '_' + ':'.join(frame['frame_type'] for frame in quic_logger_frames)
             # if 'ping' not in tmp:
-            if tmp == '1RTT_ping:padding' or tmp == 'initial_ping:padding' or tmp == 'handshake_ping:padding':
+            if tmp == '1RTT_ping:padding' or tmp == 'initial_ping:padding' or tmp == 'handshake_ping:padding'\
+                    or tmp == '1RTT_ping' or tmp == 'initial_ping' or tmp == 'handshake_ping':
                 ping = True
-            tmp = tmp.replace('1RTT_ping:padding', '')
-            tmp = tmp.replace('initial_ping:padding', '')
-            tmp = tmp.replace('handshake_ping:padding', '')
+                tmp = tmp.replace('1RTT_ping:padding', '')
+                tmp = tmp.replace('initial_ping:padding', '')
+                tmp = tmp.replace('handshake_ping:padding', '')
+                tmp = tmp.replace('1RTT_ping', '')
+                tmp = tmp.replace('initial_ping', '')
+                tmp = tmp.replace('handshake_ping', '')
+            if 'initial' in tmp and 'crypto' in tmp:
+                if self._initial_crypto is False:
+                    self._initial_crypto = True
+                else:
+                    ping = True
+                    self._handshake_crypto = True
+                    continue
+            if 'handshake' in tmp and 'crypto' in tmp:
+                if self._initial_ack_send is True:
+                    ping = True
+                    continue
+                if self._handshake_crypto_cb is True:
+                    ping = True
+                    continue
+
+            if '1RTT' in tmp:
+                if 'done' in tmp:
+                    if self._1rtt_done is False:
+                        self._1rtt_done = True
+                    else:
+                        ping = True
+                        continue
+                if 'new_connection_id' in tmp:
+                    if self._newid_cb is False:
+                        self._newid = True
+                    else:
+                        ping = True
+                        continue
+                # elif self._1rtt_done_cb is True:
+                #     continue
             if tmp != '':
                 log.append(tmp)
         if ping is True and log == []:
@@ -2328,6 +2377,7 @@ class Handle:
         if len(datagrams) != 0:
             self._write_datagrams('bin/initial.bin', datagrams)
             self._packet_number += 1
+            self._initial_send = True
         else:
             return self._get_datagrams('bin/initial.bin')
         return datagrams
@@ -2364,6 +2414,7 @@ class Handle:
         if len(datagrams) != 0:
             # self._write_datagrams('bin/initial_ack.bin', datagrams)
             self._packet_number += 1
+            self._initial_ack_send = True
         else:
             return self._get_datagrams('bin/initial_ack.bin')
         return datagrams
@@ -2421,6 +2472,7 @@ class Handle:
         if len(datagrams) != 0:
             self._write_datagrams('bin/handshake.bin', datagrams)
             self._packet_number += 1
+            self._handshake_send = True
         else:
             return self._get_datagrams('bin/handshake.bin')
         return datagrams
