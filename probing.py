@@ -40,6 +40,7 @@ def main ():
                 file.write(f'"{word} / {response}",')
                 # output.append(f'{word} / {response}')
                 # print(f'"{word} / {response}",')
+            file.write('\n')
             client.close()
 
 main()
