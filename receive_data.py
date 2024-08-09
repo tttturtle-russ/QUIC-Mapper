@@ -976,41 +976,41 @@ class Handle:
                 tmp = tmp.replace('1RTT_ping', '')
                 tmp = tmp.replace('initial_ping', '')
                 tmp = tmp.replace('handshake_ping', '')
-            if 'initial' in tmp and 'crypto' in tmp:
-                if 'padding' not in tmp:
-                    self._handshake_crypto = True
-                if self._initial_crypto is False:
-                    self._initial_crypto = True
-                else:
-                    ping = True
-                    self._handshake_crypto = True
-                    continue
-            if 'handshake_' in tmp and 'crypto' in tmp:
-                if self._initial_ack_send is True:
-                    ping = True
-                    continue
-                self._handshake_crypto = True
-                if self._handshake_crypto_cb is True:
-                    ping = True
-                    continue
-
-            if '1RTT' in tmp:
-                if 'done' in tmp:
-                    if self._1rtt_done is False:
-                        self._1rtt_done = True
-                    else:
-                        ping = True
-                        continue
-                if 'new_connection_id' in tmp:
-                    if self._newid_cb is False:
-                        self._newid = True
-                    else:
-                        ping = True
-                        continue
-                # elif self._1rtt_done_cb is True:
-                #     continue
-            tmp = tmp.replace(':ping', '')
-            tmp = tmp.replace('_ping','')
+            # if 'initial' in tmp and 'crypto' in tmp:
+            #     if 'padding' not in tmp:
+            #         self._handshake_crypto = True
+            #     if self._initial_crypto is False:
+            #         self._initial_crypto = True
+            #     else:
+            #         ping = True
+            #         self._handshake_crypto = True
+            #         continue
+            # if 'handshake_' in tmp and 'crypto' in tmp:
+            #     if self._initial_ack_send is True:
+            #         ping = True
+            #         continue
+            #     self._handshake_crypto = True
+            #     if self._handshake_crypto_cb is True:
+            #         ping = True
+            #         continue
+            #
+            # if '1RTT' in tmp:
+            #     if 'done' in tmp:
+            #         if self._1rtt_done is False:
+            #             self._1rtt_done = True
+            #         else:
+            #             ping = True
+            #             continue
+            #     if 'new_connection_id' in tmp:
+            #         if self._newid_cb is False:
+            #             self._newid = True
+            #         else:
+            #             ping = True
+            #             continue
+            #     # elif self._1rtt_done_cb is True:
+            #     #     continue
+            # tmp = tmp.replace(':ping', '')
+            # tmp = tmp.replace('_ping','')
             if tmp != '':
                 log.append(tmp)
         if ping is True and log == []:
