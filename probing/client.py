@@ -4,7 +4,7 @@ import time
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.packet import QuicProtocolVersion
 
-from client_concretization import *
+from probing.client_concretization import *
 from logger import QuicLogger
 from receive_data import Handle
 

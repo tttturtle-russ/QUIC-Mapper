@@ -24,7 +24,7 @@ def _get_datagrams(file_path):
 def main():
     # loop = asyncio.get_running_loop()
     # ip_address = socket.gethostbyname("http3-test.litespeedtech.com")
-    dst_addr = ("127.0.0.1", 10086) # server address
+    dst_addr = ("www.taobao.com", 443) # server address
     configuration = QuicConfiguration()
     configuration.supported_versions = [QuicProtocolVersion.VERSION_1]  # QUIC version can be changed
     configuration.load_verify_locations(cadata=None, cafile=None) # CA certificate can be changed
@@ -74,7 +74,7 @@ def main():
         protocol.connect()
         re()
         protocol.initial_ack_packet()
-        # re()
+        re()
         # protocol.path_challenge()
         # re()
         # protocol.path_challenge()

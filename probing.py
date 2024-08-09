@@ -35,8 +35,11 @@ def main ():
         for line_words in words_by_line:
             client.reset()
             for word in line_words:
+                # print(word)
                 response = client.send_and_receive(word)
                 file.write(f'"{word} / {response}",')
                 # output.append(f'{word} / {response}')
                 # print(f'"{word} / {response}",')
             client.close()
+
+main()
