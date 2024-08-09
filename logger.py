@@ -114,7 +114,7 @@ class QuicLoggerTrace:
         return {"frame_type": "datagram", "length": length}
 
     def encode_handshake_done_frame(self) -> Dict:
-        return {"frame_type": "handshakedone"}
+        return {"frame_type": "handshake_done"}
 
     def encode_max_stream_data_frame(self, maximum: int, stream_id: int) -> Dict:
         return {
