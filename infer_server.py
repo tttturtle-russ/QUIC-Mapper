@@ -151,17 +151,17 @@ class QUICServerKnowledgeBase(ActiveKnowledgeBase):
                     response = next_msg
             time_now = time.time()
             if time_now - start_time > self.timeout_set:
-                # next_msg = self.receive()
-                # if not next_msg:
-                #     break
-                # if next_msg == 'ping':
-                #     # print('ping')
-                #     next_msg = self.receive()
-                # if next_msg and next_msg != '' and next_msg != 'ping':
-                #     if response != '':
-                #         response += '+' + next_msg
-                #     else:
-                #         response = next_msg
+                next_msg = self.receive()
+                if not next_msg:
+                    break
+                if next_msg == 'ping':
+                    # print('ping')
+                    next_msg = self.receive()
+                if next_msg and next_msg != '' and next_msg != 'ping':
+                    if response != '':
+                        response += '+' + next_msg
+                    else:
+                        response = next_msg
                 break
             # self.pre_msg = next_msg
 
